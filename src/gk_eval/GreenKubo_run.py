@@ -130,10 +130,13 @@ class GreenKubo_run:
             take_every (int, optional): The interval to sample the flux data. Defaults to 1.
             dt (float, optional): The time step in femtoseconds. Defaults to 1.0.
             n_cart (int, optional): The number of Cartesian components of the flux. Defaults to 3.
+            col_ind (int, optional): The column index of the first flux component data in the files. Defaults to 1.
             units (str, optional): The units of the flux. Can be "metal" or "ase". Defaults to "metal".
             temperature (float, optional): The temperature in Kelvin. If not specified, the temperature will be
                 computed from the mean of the first column of the flux file. Defaults to None.
             nw (bool, optional): Flag to indicate if the simulation was performed on a nanowire. Defaults to False.
+            convective (bool, list, optional): Flag to specify a file to read the convective component of the flux. Defaults to False.
+            independent_flux (bool, optional): Flag to indicate if the flux from each file is to be treated as if originating from independent simulations. Defaults to False.
             fmod (int, optional): The number to modulo the flux length by. This is to cut away minor outliers Defaults to 1.
             hf_lammps (bool, optional): Flag to indicate if the heat flux was calculated as in the lammps tutorial.
 
@@ -153,7 +156,7 @@ class GreenKubo_run:
         self.hf_lammps = hf_lammps
         self.atoms = ase.io.read(atoms_file)
         if nw:
-            from swieser_scripts.struct.nanowire import Nanowire
+            from gk_eval.struct.nanowire import Nanowire
 
             self.nw = Nanowire(self.atoms)
             # assuming the heat flux was already divided by this volume
@@ -250,6 +253,7 @@ class GreenKubo_run:
         self.time_index = np.array(range(len(self.temp))) * self.dt
 
         return flux
+
 
     def read_flux(self, flux_file, max_rows=None, take_every=1, col_ind=1):
         """

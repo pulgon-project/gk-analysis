@@ -745,6 +745,8 @@ class GreenKubo_run:
 
         return fluxes
 
+
+
     def analyze_HCACF_integral(
         self,
         convolve_window=1000,
@@ -754,6 +756,8 @@ class GreenKubo_run:
         newfig=True,
         raw_HCACF=False,
         fast_mode=False,
+        plot_ACF=True,
+        plot_kappa=True,
     ):
         """
         Analyzes the HCACF integral and visualizes the cumulative thermal conductivity.
@@ -834,50 +838,59 @@ class GreenKubo_run:
         plt.ylabel(KAPPA_LABEL, color="C0")
         # plt.xlim([0, self.dt * 1e6])
         ax1 = plt.gca()
-        ax2 = plt.twinx(ax1)
-        # ax2.plot(np.array(range(len(hcacf))) * self.dt * 1e3, hcacf, c="r", alpha=0.5, label="HCACF")
-        ax2.axhline(0, c="k", alpha=0.5)
-        plt.ylabel(HFACF_LABEL, color="green")
+        if plot_ACF:
+            if plot_kappa:
+                ax2 = plt.twinx(ax1)
+            else:
+                ax2 = ax1
+            # ax2.plot(np.array(range(len(hcacf))) * self.dt * 1e3, hcacf, c="r", alpha=0.5, label="HCACF")
+            ax2.axhline(0, c="k", alpha=0.5)
+            plt.ylabel(HFACF_LABEL, color="green")
+            if raw_HCACF:
+                ax2.plot(
+                    np.array(range(len(hcacf))) * self.dt * 1e3 / 1e6,
+                    hcacf * self.HCACF_UNIT / 1e18,
+                    c="r",
+                    alpha=0.5,
+                    label="HFACF (raw)",
+                    zorder=-5,
+                )
+            if convolve_window is not None:
+                N = convolve_window
+                xvals = np.array(range(len(hcacf)))[int(N / 2) : int(-N / 2) + 1]
+                if len(xvals) > 0:
+                    convolution = (
+                        np.convolve(hcacf, np.ones(N) / N, mode="valid")
+                        * self.HCACF_UNIT
+                        / 1e18
+                    )
 
-        if raw_HCACF:
-            ax2.plot(
-                np.array(range(len(hcacf))) * self.dt * 1e3 / 1e6,
-                hcacf * self.HCACF_UNIT / 1e18,
-                c="r",
-                alpha=0.5,
-                label="HFACF (raw)",
-                zorder=-5,
-            )
-        N = convolve_window
-        xvals = np.array(range(len(hcacf)))[int(N / 2) : int(-N / 2) + 1]
-        if len(xvals) > 0:
-            convolution = (
-                np.convolve(hcacf, np.ones(N) / N, mode="valid")
-                * self.HCACF_UNIT
-                / 1e18
-            )
+                    ax2.plot(
+                        xvals * self.dt * 1e3 / 1e6,
+                        convolution,
+                        c="green",
+                        alpha=0.5,
+                        label="HFACF (smooth)",
+                    )
 
-            ax2.plot(
-                xvals * self.dt * 1e3 / 1e6,
-                convolution,
-                c="green",
-                alpha=0.5,
-                label="HFACF (smooth)",
+                    ax2.set_ylim([min(convolution), max(convolution)])
+        if plot_kappa:
+            ax1.plot(
+                np.array(range(len(cumul))) * self.dt * 1e3 / 1e6,
+                cumul,
+                label="thermal cond.",
+                zorder=6,
+                color="C0",
             )
-
-            ax2.set_ylim([min(convolution), max(convolution)])
-        ax1.plot(
-            np.array(range(len(cumul))) * self.dt * 1e3 / 1e6,
-            cumul,
-            label="thermal cond.",
-            zorder=6,
-            color="C0",
-        )
-        ax1.set_zorder(ax2.get_zorder() + 1)
-        ax1.set_frame_on(False)
+            ax1.set_zorder(ax2.get_zorder() + 1)
+            ax1.set_frame_on(False)
+        
         leghandles1, _ = ax1.get_legend_handles_labels()
-        leghandles2, _ = ax2.get_legend_handles_labels()
-        plt.legend(handles=leghandles1 + leghandles2, loc="lower right", fontsize=10)
+        if plot_ACF and plot_kappa:
+            leghandles2, _ = ax2.get_legend_handles_labels()
+            plt.legend(handles=leghandles1 + leghandles2, loc="lower right", fontsize=10)
+        else:
+            plt.legend(handles=leghandles1, loc="lower right", fontsize=10)
         # plt.semilogx()
         # plt.show()
         plt.savefig("kappa_cumul_HCACF.png")

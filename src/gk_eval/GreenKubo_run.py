@@ -852,7 +852,7 @@ class GreenKubo_run:
                     hcacf * self.HCACF_UNIT / 1e18,
                     c="r",
                     alpha=0.5,
-                    label="HFACF (raw)",
+                    label="HFACF",
                     zorder=-5,
                 )
             if convolve_window is not None:
@@ -882,8 +882,9 @@ class GreenKubo_run:
                 zorder=6,
                 color="C0",
             )
-            ax1.set_zorder(ax2.get_zorder() + 1)
-            ax1.set_frame_on(False)
+            if plot_ACF:
+                ax1.set_zorder(ax2.get_zorder() + 1)
+                ax1.set_frame_on(False)
         
         leghandles1, _ = ax1.get_legend_handles_labels()
         if plot_ACF and plot_kappa:

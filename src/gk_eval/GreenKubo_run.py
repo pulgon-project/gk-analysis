@@ -545,7 +545,7 @@ class GreenKubo_run:
         self.kappa_averaged = None
         if f_star is None:
             f_star = self.detect_f_star()
-        # computing the cutoff to be used for the resample_poly function - also stolen from Jesus
+        # computing the cutoff to be used for the resample_poly function
         cutoff_steps = int(round(1.0 / (f_star * 2.0 * self.dt)))
         if cutoff_steps == 0:
             cutoff_steps = 1

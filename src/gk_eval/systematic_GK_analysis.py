@@ -215,6 +215,13 @@ def main():
         help="store cepstral plots as individual figures",
     )
     parser.add_argument(
+        "--full_fold",
+        dest="full_fold",
+        action="store_true",
+        default=False,
+        help="do foldings only in full steps of trajectory segments.",
+    )
+    parser.add_argument(
         "--hf_lammps",
         dest="hf_lammps",
         action="store_true",
@@ -231,7 +238,12 @@ def main():
     afp.close()
     file_suffix = ""
     if args.folds is not None:
-        file_suffix += f"_folds{args.folds}"
+        file_suffix += f"_folds"
+    if args.full_fold:
+        file_suffix = "_full" + file_suffix
+    part_fsuff = file_suffix
+    if args.folds is not None:
+        file_suffix += f"_{args.folds}"
     if args.num_c_tests is not None:
         num_c_tests = args.num_c_tests
     else:
@@ -278,21 +290,30 @@ def main():
             kappas_0 = []
             kappa_errs = []
             with matplotlib.backends.backend_pdf.PdfPages(
-                f"cepstral_analysis_time_convergence_folds{fold}.pdf"
+                f"cepstral_analysis_time_convergence{part_fsuff}_{fold}.pdf"
             ) as pdf:
-                corresponding_time_conv = np.linspace(
-                    0, n_steps, fold + 1, dtype=int
-                )[1:]
-                selected_time_conv = np.array(
-                    np.linspace(0, len(corresponding_time_conv) - 1, num_tests)
-                ).astype(int)
-                selected_time_conv = corresponding_time_conv[selected_time_conv]
-                for val in selected_time_conv:
-                    print(val)
+                if args.full_fold:
+                    corresponding_time_conv = np.linspace(
+                        0, n_steps, fold + 1, dtype=int
+                    )[1:]
+                    selected_time_conv = np.array(
+                        np.linspace(0, len(corresponding_time_conv) - 1, num_tests)
+                    ).astype(int)
+
+                    selected_time_conv = corresponding_time_conv[selected_time_conv]
+                else:
+                    selected_time_conv = time_conv
+
+                for vid, val in enumerate(selected_time_conv):
+                    if args.full_fold:
+                        new_fold = int(fold * (vid + 1) / len(corresponding_time_conv))
+                    else:
+                        new_fold = fold
+                    print(val, new_fold)
                     kappa, kappa_err = gkrun.cepstral_analysis(
                         f_star=args.cutoff,
                         max_eval=int(val),
-                        folds=fold,
+                        folds=new_fold,
                         max_coeffs=args.max_coeffs,
                         AICc=True,
                         model_averaging=args.model_averaging,
@@ -331,7 +352,7 @@ def main():
             plt.plot(time_conv * args.delta_t / 1e6, pstars, label=f"folding {fold}")
 
             np.savetxt(
-                f"kappa_time_convergence_{fold}.txt",
+                f"kappa_time_convergence{part_fsuff}_{fold}.txt",
                 np.c_[time_conv * args.delta_t, kappas, kappa_errs],
             )
 
@@ -480,7 +501,7 @@ def main():
                     np.c_[time_conv * args.delta_t, kappas, kappa_errs],
                 )
 
-            # this is the reasonable approach
+            # this is the more reasonable approach for the direct evaluation
             kappas_full = []
             kappa_errs = []
             with matplotlib.backends.backend_pdf.PdfPages(

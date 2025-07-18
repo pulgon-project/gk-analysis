@@ -914,6 +914,8 @@ class GreenKubo_run:
 
         if kute_test_mode:
             fast_mode = False
+        
+        kute_results = {}
 
         fluxes = self.fold_flux(
             folds=folds, mean_correction=mean_correction, max_eval=max_eval
@@ -949,11 +951,14 @@ class GreenKubo_run:
 
         hcacf /= num_fluxes
         individual_corrs = np.array(individual_corrs)
+        kute_results["hcacf"] = hcacf
+        kute_results["individual_corrs"] = individual_corrs
         if not fast_mode:
             individual_cumuls = np.array(individual_cumuls)
             individual_cumuls *= (
                 self.volume / (self.kB * self.temperature**2) * self.SI_PREFACTOR
             )
+            kute_results["individual_cumuls"] = individual_cumuls
         # uncertainty from the squared fluxes
         hcacf_uncertainty = np.zeros(len_segments)
         for i in range(num_fluxes):
@@ -973,7 +978,7 @@ class GreenKubo_run:
             * 1
             / (div_factor) ** 0.5
         )
-
+        kute_results["hcacf_uncertainty"] = hcacf_uncertainty
         # basic cumulative trapz integral
         cumul = (
             cumulative_trapezoid(hcacf, np.array(range(len(hcacf))))
@@ -985,6 +990,8 @@ class GreenKubo_run:
         cumul = (
             cumul * self.volume / (self.kB * self.temperature**2) * self.SI_PREFACTOR
         )
+
+        kute_results["cumul"] = cumul
 
         # uncertainty of the integral
         cumul_uncertainty = (
@@ -999,12 +1006,16 @@ class GreenKubo_run:
             self.volume / (self.kB * self.temperature**2) * self.SI_PREFACTOR
         )
 
+        kute_results["cumul_uncertainty"] = cumul_uncertainty
+
         # compute the weighted thermal conductivity
         # this is an "average to the end" type of quantity
         flipped_weights = np.flip(cumul_uncertainty**-2)
         weighted_integral = np.flip(
             np.cumsum(np.flip(cumul) * flipped_weights) / np.cumsum(flipped_weights)
         )
+
+        kute_results["weighted_integral"] = weighted_integral
 
         # uncertainty of the weighted integral
         # I believe the uncertainty in the KUTE code is incorrect
@@ -1054,6 +1065,8 @@ class GreenKubo_run:
                         ),
                     )
         weighted_integral_uncertainty = np.append(kute_uncertainty, 0)
+
+        kute_results["weighted_integral_uncertainty"] = weighted_integral_uncertainty
         # plot stuff
         ns_factor = self.dt * 1e3 / 1e6
         xvals = np.array(range(len_segments)) * ns_factor
@@ -1108,8 +1121,8 @@ class GreenKubo_run:
         plt.ylabel(KAPPA_LABEL)
         interval = int(len(xvals[:-2]) / 1000)
         if not fast_mode:
-            # for i in range(num_fluxes):
-            #     plt.plot(xvals[:-2][::interval], individual_cumuls[i][::interval])
+            for i in range(num_fluxes):
+                plt.plot(xvals[:-2][::interval], individual_cumuls[i][::interval])
             mean_cumuls = np.mean(individual_cumuls, axis=0)
             ylims = [np.min(mean_cumuls), np.max(mean_cumuls)]
         else:
@@ -1159,7 +1172,7 @@ class GreenKubo_run:
         plt.savefig("kappa_cumul_HCACF_KUTE.png")
         if kute_test_mode:
             plt.show()
-
+        self.kute_results = kute_results
         return weighted_integral, weighted_integral_uncertainty, fig
 
     def analyze_euler(

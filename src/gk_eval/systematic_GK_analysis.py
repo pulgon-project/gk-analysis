@@ -180,10 +180,11 @@ def main():
         help="fast mode, faster evaluations but figures contain fewer details",
     )
     parser.add_argument(
-        "--kute_extract",
-        dest="kute_extract",
+        "--hfacf_extract",
+        dest="hfacf_extract",
         type=float,
-        default=0.5,
+        nargs="*",
+        default=[0.5],
         help="at which fraction of the spectrum is the thermal conductivity obtained",
     )
     parser.add_argument(
@@ -249,7 +250,7 @@ def main():
     part_fsuff = file_suffix
     if args.folds is not None:
         file_suffix += f"_{args.folds}"
-        
+
     fname = args.run_file
     struct_file = args.poscar
     gkrun = GreenKubo_run(
@@ -349,7 +350,12 @@ def main():
             else:
                 labelstr = f"folding {fold}"
             plt.figure(1)
-            plt.plot(selected_time_conv * args.delta_t / 1e6, kappas, label=labelstr, marker="o")
+            plt.plot(
+                selected_time_conv * args.delta_t / 1e6,
+                kappas,
+                label=labelstr,
+                marker="o",
+            )
             plt.fill_between(
                 selected_time_conv * args.delta_t / 1e6,
                 np.array(kappas) - np.array(kappa_errs),
@@ -357,7 +363,12 @@ def main():
                 alpha=0.3,
             )
             plt.figure(3)
-            plt.plot(selected_time_conv * args.delta_t / 1e6, pstars, label=labelstr, marker="o")
+            plt.plot(
+                selected_time_conv * args.delta_t / 1e6,
+                pstars,
+                label=labelstr,
+                marker="o",
+            )
 
             np.savetxt(
                 f"kappa_time_convergence{part_fsuff}_{fold}.txt",
@@ -365,7 +376,12 @@ def main():
             )
 
             plt.figure(8)
-            plt.plot(selected_time_conv * args.delta_t / 1e6, kappas_0, label=labelstr, marker="o")
+            plt.plot(
+                selected_time_conv * args.delta_t / 1e6,
+                kappas_0,
+                label=labelstr,
+                marker="o",
+            )
 
         plt.figure(1)
         if args.folds is not None:
@@ -464,11 +480,20 @@ def main():
         gkevalfunc = gkrun.analyze_euler
     else:
         gkevalfunc = gkrun.analyze_HCACF_integral
+
+    kappas = {}
+    kappa_errs = {}
     if not args.nohcacf:
-        hcacf_extract_value = args.kute_extract
+        hcacf_extract_values = args.hfacf_extract
         if not args.fast:
             plt.figure(7)
         for fold in folds:
+            kappas[fold] = {}
+            kappa_errs[fold] = {}
+            for hcacf_val in hcacf_extract_values:
+                kappas[fold][hcacf_val] = []
+                kappa_errs[fold][hcacf_val] = []
+
             if not args.full_fold:
                 kappas = []
                 kappa_errs = []
@@ -484,40 +509,36 @@ def main():
                             fast_mode=args.fast,
                             raw_HCACF=args.raw_HCACF,
                         )
-                        kappas.append(kappa[int(len(kappa) * hcacf_extract_value)])
-                        kappa_errs.append(
-                            kappa_err[int(len(kappa) * hcacf_extract_value)]
-                        )
                         fig.suptitle(f"n_step: {val}")
                         plt.tight_layout()
                         pdf.savefig(fig)
                         # plt.clf()
                         plt.close(fig)
-                plt.figure(7)
-                plt.plot(
-                    time_conv * args.delta_t / 1e6, kappas, label=f"folding {fold}"
-                )
-                # plt.fill_between(
-                #     time_conv * args.delta_t,
-                #     np.array(kappas) - np.array(kappa_errs),
-                #     np.array(kappas) + np.array(kappa_errs),
-                #     alpha=0.3,
-                # )
+                        for hcacf_val in hcacf_extract_values:
+                            kappas[fold][hcacf_val].append(
+                                kappa[int(len(kappa) * [hcacf_val])]
+                            )
+                            kappa_errs[fold][hcacf_val].append(
+                                kappa_err[int(len(kappa) * [hcacf_val])]
+                            )
 
-                np.savetxt(
-                    f"kappa_time_convergence_HCACF_{fold}.txt",
-                    np.c_[time_conv * args.delta_t, kappas, kappa_errs],
-                )
+                    for hcacf_val in hcacf_extract_values:
+                        np.savetxt(
+                            f"kappa_time_convergence_HCACF_ex_{hcacf_val}_{fold}.txt",
+                            np.c_[
+                                time_conv * args.delta_t,
+                                kappas[fold][hcacf_val],
+                                kappa_errs[fold][hcacf_val],
+                            ],
+                        )
             elif args.full_fold:
                 # this is the more reasonable approach for the direct evaluation
-                kappas_full = []
-                kappa_errs = []
                 with matplotlib.backends.backend_pdf.PdfPages(
                     f"HCACF_analysis_time_convergence_full_folds{fold}.pdf"
                 ) as pdf:
-                    corresponding_time_conv = np.linspace(0, n_steps, fold + 1, dtype=int)[
-                        1:
-                    ]
+                    corresponding_time_conv = np.linspace(
+                        0, n_steps, fold + 1, dtype=int
+                    )[1:]
                     for vid, val in enumerate(corresponding_time_conv):
                         new_fold = int(fold * (vid + 1) / len(corresponding_time_conv))
                         print(val, new_fold)
@@ -527,38 +548,53 @@ def main():
                             mean_correction=False,
                             fast_mode=args.fast,
                         )
-                        kappa_errs.append(kappa_err[int(len(kappa) * hcacf_extract_value)])
-                        kappas_full.append(kappa[int(len(kappa) * hcacf_extract_value)])
                         fig.suptitle(f"n_step: {val}")
                         plt.tight_layout()
                         pdf.savefig(fig)
                         # plt.clf()
                         plt.close(fig)
-                plt.figure(8)
+
+                        for hcacf_val in hcacf_extract_values:
+                            kappa_errs[fold][hcacf_val].append(
+                                kappa_err[int(len(kappa) * hcacf_val)]
+                            )
+                            kappas[fold][hcacf_val].append(
+                                kappa[int(len(kappa) * hcacf_val)]
+                            )
+                    for hcacf_val in hcacf_extract_values:
+                        np.savetxt(
+                            f"kappa_time_convergence_HCACF_full_ex_{hcacf_val}_{fold}.txt",
+                            np.c_[
+                                corresponding_time_conv * args.delta_t,
+                                kappas[fold][hcacf_val],
+                                kappa_errs[fold][hcacf_val],
+                            ],
+                        )
+        conv_fig = plt.figure()
+        for hcacf_val in hcacf_extract_values:
+
+            for fold in folds:
+                corresponding_time_conv = np.linspace(0, n_steps, fold + 1, dtype=int)[
+                    1:
+                ]
                 plt.plot(
                     corresponding_time_conv * args.delta_t / 1e6,
-                    kappas_full,
-                    label=f"time {corresponding_time_conv[0] * args.delta_t / 1e6}",
+                    kappas[fold][hcacf_val],
+                    label=f"corr. time: {corresponding_time_conv[0] * args.delta_t / 1e6} ns",
                 )
-                np.savetxt(
-                    f"kappa_time_convergence_HCACF_full_{fold}.txt",
-                    np.c_[corresponding_time_conv * args.delta_t, kappas_full, kappa_errs],
-                )
-
-        if not args.full_fold:
-            plt.figure(7)
             if args.folds is not None:
                 plt.legend()
             plt.xlabel(TIME_LABEL)
             plt.ylabel(KAPPA_LABEL)
-            plt.savefig(f"kappa_time_convergence_HCACF{file_suffix}.pdf")
-        elif args.full_fold:
-            plt.figure(8)
-            if args.folds is not None:
-                plt.legend()
-            plt.xlabel(TIME_LABEL)
-            plt.ylabel(KAPPA_LABEL)
-            plt.savefig(f"kappa_time_convergence_HCACF_full{file_suffix}.pdf")
+            if not args.full_fold:
+                plt.savefig(
+                    f"kappa_time_convergence_HCACF_ex_{hcacf_val}{file_suffix}.pdf"
+                )
+            elif args.full_fold:
+                plt.savefig(
+                    f"kappa_time_convergence_HCACF_fullex_{hcacf_val}{file_suffix}.pdf"
+                )
+            conv_fig.clf()
 
     if not args.noshow:
         plt.show()

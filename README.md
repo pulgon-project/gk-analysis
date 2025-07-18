@@ -18,4 +18,4 @@ pip install .
 
 ## Usage
 
-WIP
+The primary class to analyse Green-Kubo calculations is provided in `GreenKubo_run` and its basic usage is:

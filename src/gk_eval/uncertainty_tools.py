@@ -32,8 +32,6 @@ HCACF_UNIT = flux2SI**2
 time_factor = 1.0
 
 
-
-
 def calc_correlation_old(data, num_pieces):
     """
     Function to compute the autocorrelation out of a set of data by first splitting it into individual pieces.
@@ -66,6 +64,7 @@ def calc_correlation_old(data, num_pieces):
     unc_caf = np.sqrt(caf2 - corrfunc**2) / np.sqrt(num_pieces * contributions - 1)
     return corrfunc, uncertainty, unc_caf, corrdiff
 
+
 def calc_correlation(data, num_pieces=None):
     """
     Function to compute the autocorrelation out of a set of data by first splitting it into individual pieces.
@@ -82,18 +81,17 @@ def calc_correlation(data, num_pieces=None):
     corrfuncs = []
     plen = len(pieced_data[0])
     contributions = np.array([plen - k for k in range(plen - 1)])
-    contributions =(
-                np.flip(np.array(range(len(pieced_data[0]))) + 1)
-            )
+    contributions = np.flip(np.array(range(len(pieced_data[0]))) + 1)
     # this is BIG - better to just evaluate the required sum
     # covariance = np.zeros((len(pieced_data[0])-1, len(pieced_data[0])-1))
-    caf2 = np.zeros(plen )
+    caf2 = np.zeros(plen)
     for piece in pieced_data:
-        corrfuncs.append(correlate(piece, piece, method="fft")[len(pieced_data[0])-1 :] / contributions)
-        corrfunc += (corrfuncs[-1]
-            
+        corrfuncs.append(
+            correlate(piece, piece, method="fft")[len(pieced_data[0]) - 1 :]
+            / contributions
         )
-        caf2 += correlate(piece**2, piece**2)[len(pieced_data[0])-1 :]
+        corrfunc += corrfuncs[-1]
+        caf2 += correlate(piece**2, piece**2)[len(pieced_data[0]) - 1 :]
 
     corrfunc = corrfunc / len(pieced_data)
     caf2 /= num_pieces * contributions
@@ -102,13 +100,16 @@ def calc_correlation(data, num_pieces=None):
     for cid, cf in enumerate(corrfuncs):
         corrdiff[cid] = cf - corrfunc
     uncertainty = np.sqrt(
-        1 / num_pieces * np.sum(corrdiff**2, axis=0)
+        1 / (num_pieces) * np.sum(corrdiff**2, axis=0)
     )  # / np.sqrt(num_pieces)
     unc_caf = np.sqrt(caf2 - corrfunc**2) / np.sqrt(num_pieces * contributions - 1)
     return corrfunc, uncertainty, unc_caf, corrdiff
 
-@numba.njit(parallel=False)  # parallelization is suboptimal as the next value reuses the previous
-def compute_cov_contrib(corrdiff : np.ndarray):
+
+@numba.njit(
+    parallel=False
+)  # parallelization is suboptimal as the next value reuses the previous
+def compute_cov_contrib(corrdiff: np.ndarray):
     """
     Compute the uncertainty contribution for the Euler integral.
     This does not store the covariance matrix in the memory and only computes the lower triangular matrix
@@ -117,16 +118,25 @@ def compute_cov_contrib(corrdiff : np.ndarray):
     k = corrdiff.shape[1]
     covariance_contrib = np.zeros(k)
 
-    for l in range(1, k): 
-        covariance_contrib[l] = covariance_contrib[l-1]
+    for l in range(1, k):
+        covariance_contrib[l] = covariance_contrib[l - 1]
         for j in range(M):
-            for i in range(0, l): 
+            for i in range(0, l):
                 covariance_contrib[l] += corrdiff[j, l] * corrdiff[j, i]
-        
-    return covariance_contrib / M
+
+    return covariance_contrib / (M - 1) / M
+
 
 def calc_euler_integral(
-    data, dt, unc_corr, corrdiff, include_cov=False, fast_cov=True, SI_PREFACTOR=SI_PREFACTOR, volume=1.0, temperature=300
+    data,
+    dt,
+    unc_corr,
+    corrdiff,
+    include_cov=False,
+    fast_cov=True,
+    SI_PREFACTOR=SI_PREFACTOR,
+    volume=1.0,
+    temperature=300,
 ):
     """
     Computes a cumulative integral over a correlation function using an Euler integral.
@@ -150,7 +160,7 @@ def calc_euler_integral(
                 # covariance_contrib[l] = np.sum(cov[: l - 1, 1:l])
                 # covariance_contrib[l] = covariance_contrib[l-1] + cov[l-1,l-1] + np.sum(cov[:l-1,l])
                 # previous definition was not correct (but not far off - numbers are similar)
-                covariance_contrib[l] = covariance_contrib[l-1] + np.sum(cov[l, 0:l])
+                covariance_contrib[l] = covariance_contrib[l - 1] + np.sum(cov[l, 0:l])
         # else:
         #     for l in tqdm(range(0, k)):
         #         for i in range(0, l - 1):
@@ -163,7 +173,7 @@ def calc_euler_integral(
         covariance_contrib = 0
     n_contrib = dt**2 * np.cumsum(unc_corr**2)
     cov_contrib = dt**2 * 2 * covariance_contrib
-    unc_cumul = n_contrib + covariance_contrib
+    unc_cumul = n_contrib + cov_contrib
     pref = volume / (kB * temperature**2)
     return (
         cumul * SI_PREFACTOR * pref,
@@ -172,12 +182,15 @@ def calc_euler_integral(
         cov_contrib * SI_PREFACTOR**2 * pref**2,
     )
 
-def calc_cumtrapz_integral(data, dt, unc_caf, SI_PREFACTOR=SI_PREFACTOR, volume=1.0, temperature=300):
+
+def calc_cumtrapz_integral(
+    data, dt, unc_caf, SI_PREFACTOR=SI_PREFACTOR, volume=1.0, temperature=300
+):
 
     cumul = cumulative_trapezoid(data, np.arange(len(data)), initial=0) * dt
     unc_trapzs = np.zeros(len(data))
-    unc_trapzs[1:] = (
-        np.array([unc_caf[i] ** 2 + unc_caf[i - 1] ** 2 for i in range(1, len(cumul))])
+    unc_trapzs[1:] = np.array(
+        [unc_caf[i] ** 2 + unc_caf[i - 1] ** 2 for i in range(1, len(cumul))]
     )
     unc_cumul = (dt / 2) * np.sqrt(np.cumsum(unc_trapzs))
     pref = volume / (kB * temperature**2)

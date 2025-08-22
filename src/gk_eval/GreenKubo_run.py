@@ -195,7 +195,6 @@ class GreenKubo_run:
             self.kB = ase.units.kB
             self.time_factor = ase.units.fs
             self.HCACF_UNIT = ase.units.J**2
-            # self.dt /= ase.units.fs
 
     def _read_flux(self, flux_file, max_rows=None, take_every=1):
         """
@@ -253,7 +252,6 @@ class GreenKubo_run:
         self.time_index = np.array(range(len(self.temp))) * self.dt
 
         return flux
-
 
     def read_flux(self, flux_file, max_rows=None, take_every=1, col_ind=1):
         """
@@ -345,21 +343,13 @@ class GreenKubo_run:
 
         unit_factor = self.SI_PREFACTOR * self.prefactor / 2
         plt.sca(axs[0])
-        s_k_bar_smooth = np.convolve(
-            self.spectra, np.ones(N_smooth) / N_smooth, mode="same"
-        )
         num_2_plot = self.P_star * 4
-        # s_k_bar_smooth = s_k_bar
         plt.plot(
             self.freqs[self.freqs >= 0],
             self.spectra[self.freqs >= 0] * unit_factor,
             label="raw spectrum",
         )
-        # plt.plot(self.freqs, s_k_bar_smooth.real)
         interval_freqs = np.linspace(0, max(self.freqs), 50)
-        # if self.expfit is not None:
-        #     plt.plot(interval_freqs, expdecay(interval_freqs, self.expfit[0]) * unit_factor, color="r", label="expdecay")
-        # plt.semilogy()
         plt.xlim([0, max(self.freqs)])
         plt.xlabel("frequency / THz")
         plt.ylabel("$\\bar{S}(f)$ / $\mathrm{Wm^{-1}K^{-1}}$")
@@ -372,7 +362,6 @@ class GreenKubo_run:
         plt.axvline(x=self.P_star, ls="--", c="r")
         plt.xlabel("P")
         plt.ylabel("cepstral coefficient")
-        # plt.tight_layout()
 
         plt.sca(axs[2])
         plt.plot(range(len(self.aic)), self.aic)
@@ -383,7 +372,6 @@ class GreenKubo_run:
         plt.ylabel("AIC$_c$")
         plt.axvline(self.P_star, color="red", ls="--")
         plt.axhline(np.min(self.aic), color="red", ls="--")
-        # plt.tight_layout()
 
         plt.sca(axs[3])
         val_range = range(len(self.kappas[:num_2_plot]))
@@ -406,7 +394,6 @@ class GreenKubo_run:
         plt.legend(fontsize=10)
         plt.xlabel("P")
         plt.ylabel(KAPPA_LABEL)
-        # plt.tight_layout()
 
         if self.kappa_averaged is not None:
             plt.sca(axs[4])
@@ -414,7 +401,6 @@ class GreenKubo_run:
             plt.axvline(x=self.P_star, ls="--", c="r", label="optimal P")
             plt.xlabel("P")
             plt.ylabel("AIC$_c$ weight $w_i$")
-            # plt.tight_layout()
 
         plt.sca(axs[5])
         plt.plot(
@@ -445,15 +431,9 @@ class GreenKubo_run:
         plt.xlim([0, max(self.freqs)])
         plt.xlabel("frequency / THz")
         plt.ylabel("log $S_k$")
-        # plt.tight_layout()
 
         plt.sca(axs[0])
         if len(self.cepstral[: self.P_star]) > 1:
-            # plt.plot(
-            #     log_freqs[log_freqs >= 0],
-            #     np.exp(log_spec_from_cepstral[log_freqs >= 0]) * unit_factor,
-            #     color="C2",
-            # )
             plt.plot(
                 log_freqs[log_freqs >= 0],
                 np.exp(log_spec_from_cepstral[log_freqs >= 0] - self.L_0) * unit_factor,
@@ -501,9 +481,6 @@ class GreenKubo_run:
 
         print(np.shape(ffts))
 
-        # plt.plot(freqs, ffts[0, :, 0])
-        # plt.plot(freqs, spectra[0, 0, :])
-
         import pandas as pd
 
         filtered_spectrum = (
@@ -513,8 +490,6 @@ class GreenKubo_run:
             .to_numpy()
         )
         plt.plot(freqs, filtered_spectrum)
-
-        # plt.show()
 
         return 10.0
 
@@ -745,8 +720,6 @@ class GreenKubo_run:
 
         return fluxes
 
-
-
     def analyze_HCACF_integral(
         self,
         convolve_window=1000,
@@ -793,8 +766,6 @@ class GreenKubo_run:
                 fluxes[i, :] ** 2, fluxes[i, :] ** 2, "full", method="fft"
             )
             corr = corr[int(len(corr) / 2) :] / corrfunc_weight_factor
-            # import ipdb
-            # ipdb.set_trace()
             hcacf_uncertainty += corr
 
         div_factor = num_fluxes * corrfunc_weight_factor - 1
@@ -843,7 +814,6 @@ class GreenKubo_run:
                 ax2 = plt.twinx(ax1)
             else:
                 ax2 = ax1
-            # ax2.plot(np.array(range(len(hcacf))) * self.dt * 1e3, hcacf, c="r", alpha=0.5, label="HCACF")
             ax2.axhline(0, c="k", alpha=0.5)
             plt.ylabel(HFACF_LABEL, color="green")
             if raw_HCACF:
@@ -885,15 +855,16 @@ class GreenKubo_run:
             if plot_ACF:
                 ax1.set_zorder(ax2.get_zorder() + 1)
                 ax1.set_frame_on(False)
-        
+
         leghandles1, _ = ax1.get_legend_handles_labels()
         if plot_ACF and plot_kappa:
             leghandles2, _ = ax2.get_legend_handles_labels()
-            plt.legend(handles=leghandles1 + leghandles2, loc="lower right", fontsize=10)
+            plt.legend(
+                handles=leghandles1 + leghandles2, loc="lower right", fontsize=10
+            )
         else:
             plt.legend(handles=leghandles1, loc="lower right", fontsize=10)
         # plt.semilogx()
-        # plt.show()
         plt.savefig("kappa_cumul_HCACF.png")
         return cumul, cumul_uncertainty, fig
 
@@ -914,7 +885,7 @@ class GreenKubo_run:
 
         if kute_test_mode:
             fast_mode = False
-        
+
         kute_results = {}
 
         fluxes = self.fold_flux(
@@ -966,8 +937,6 @@ class GreenKubo_run:
                 fluxes[i, :] ** 2, fluxes[i, :] ** 2, "full", method="fft"
             )
             corr = corr[int(len(corr) / 2) :] / corrfunc_weight_factor
-            # import ipdb
-            # ipdb.set_trace()
             hcacf_uncertainty += corr
 
         div_factor = num_fluxes * corrfunc_weight_factor - 1
@@ -1018,9 +987,6 @@ class GreenKubo_run:
         kute_results["weighted_integral"] = weighted_integral
 
         # uncertainty of the weighted integral
-        # I believe the uncertainty in the KUTE code is incorrect
-        # however, this implementation is very slow
-        # it is recommended to use only nevery 10 or 100 or something like that
         running_average2 = np.flip(
             np.cumsum(np.flip(cumul**2) * flipped_weights) / np.cumsum(flipped_weights)
         )[:-1]
@@ -1029,7 +995,7 @@ class GreenKubo_run:
             (running_average2 - weighted_integral[:-1] ** 2) / contributions
         )
         if not fast_mode:
-
+            # this was just to test the implementation, not recommended as it is very slow
             if kute_test_mode:
                 weighted_integral_uncertainty = np.zeros(weighted_integral.shape)
                 for i in tqdm.tqdm(range(len(weighted_integral))):
@@ -1119,10 +1085,10 @@ class GreenKubo_run:
         plt.sca(axs[1, 0])
         plt.xlabel(TIME_LABEL)
         plt.ylabel(KAPPA_LABEL)
-        interval = int(len(xvals[:-2]) / 1000)
+        interval = int(len(xvals[:-1]) / 1000)
         if not fast_mode:
             for i in range(num_fluxes):
-                plt.plot(xvals[:-2][::interval], individual_cumuls[i][::interval])
+                plt.plot(xvals[:-1][::interval], individual_cumuls[i][::interval])
             mean_cumuls = np.mean(individual_cumuls, axis=0)
             ylims = [np.min(mean_cumuls), np.max(mean_cumuls)]
         else:
@@ -1240,7 +1206,5 @@ class GreenKubo_run:
         plt.ylabel(KAPPA_LABEL)
         plt.legend()
         plt.savefig(f"kappa_integral_euler.pdf")
-
-        # figures
 
         return integral, u_integral, fig

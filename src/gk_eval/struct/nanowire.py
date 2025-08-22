@@ -66,7 +66,6 @@ class Nanowire(Atoms):
         else:
             atoms = self
         atoms.positions -= self.get_center_of_mass()
-        # atoms.translate(np.array([0, -0.5, 0]) * self.cell.lengths())
         return atoms
 
     def to_vacuum_center(self, copy=False):
@@ -86,11 +85,6 @@ class Nanowire(Atoms):
             atoms = self
         atoms = self.to_coordinate_center(copy=copy)
         atoms.translate(np.array([0.5, 0.5, 0.5]) * self.cell.lengths())
-        # for i in range(3):
-        #     shift = atoms.positions[:,i] // self.cell.lengths()[i]
-        #     print(shift)
-        #     # if len(neg_values) > 0:
-        #     atoms.positions[:,i] -= self.cell.lengths()[i] * shift
 
         return atoms
 
@@ -106,7 +100,6 @@ class Nanowire(Atoms):
             None
         """
         rotation_axis = np.cross(vec1, vec2)
-        # the ONE place where the angle has to be given in degrees
         rotation_angle = np.arccos(np.dot(vec1, vec2)) / 2 / np.pi * 360
         self.rotate(rotation_angle, rotation_axis, rotate_cell=True)
 
@@ -317,6 +310,7 @@ class Nanowire(Atoms):
             # same for the surface area
             # unfortunately, it does not quite work like that...
             # the error is not huge though
+            # DO NOT USE FOR NOW
             atom_surface_area = 4 * np.pi * radius1**2
             overlap_surface_area = np.sum(
                 np.pi
@@ -325,14 +319,10 @@ class Nanowire(Atoms):
                     radius1
                     * (other_radii - radius1 + other_distances)
                     * (other_radii + radius1 - other_distances)
-                    # + other_radii
-                    # * (radius1 - other_radii + other_distances)
-                    # * (radius1 + other_radii - other_distances)
                 )
             )
 
             surface_area += atom_surface_area - overlap_surface_area
-        # exit()
         self.volume = volume
         self.vacuum_volume = volume - self.get_volume()
         self.surface_area = surface_area
@@ -365,24 +355,14 @@ class Nanowire(Atoms):
             self.orientation = np.logical_not(vacuum_dirs1)
             self.vacuum_dist = 2 * center_cell - (maxpos - minpos)
             self.vacuum_dist[self.orientation] = 0
-            # print(self.positions)
-            # print(vacuum_dirs1, vacuum_dirs2)
-            # print(center_cell)
-            # print(minpos, maxpos)
-            # self.set_pbc(self.orientation.copy())
             if np.sum(self.orientation) != 1:
                 # TODO: improve this so that it fails less frequently
                 print(
                     "WARNING: orientation is ambiguous. Naively assuming z orientation"
                 )
                 self.orientation = [False, False, True]
-                # from ase.visualize import view
-                # view(self)
 
         else:
-            # raise NotImplementedError(
-            #     "getting nanowire orientation is not implemented for non-orthorhombic cells"
-            # )
             print(
                 "WARNING: getting nanowire orientation is not implemented for non-orthorhombic cells. Assuming z orientation"
             )

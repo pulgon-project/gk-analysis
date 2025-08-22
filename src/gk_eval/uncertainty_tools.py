@@ -146,28 +146,14 @@ def calc_euler_integral(
     k = len(cumul)
     M = len(corrdiff)
     if include_cov:
-        # it is excruciatingly slow if I do it in the memory sparse way
         covariance_contrib = np.zeros(k)
         if fast_cov:
             # this is somewhat faster and memory light
             covariance_contrib = compute_cov_contrib(corrdiff)
         else:
-            # this eats a ton of RAM but is acceptably quick
-            # is there an easy way to only compute the lower triangular matrix?
             cov = np.einsum("ij,ik->jk", corrdiff, corrdiff) / M
-            # covariance_contrib[0] = np.sum(cov[: - 1, 1:0])
             for l in tqdm(range(1, k)):
-                # covariance_contrib[l] = np.sum(cov[: l - 1, 1:l])
-                # covariance_contrib[l] = covariance_contrib[l-1] + cov[l-1,l-1] + np.sum(cov[:l-1,l])
-                # previous definition was not correct (but not far off - numbers are similar)
-                covariance_contrib[l] = covariance_contrib[l - 1] + np.sum(cov[l, 0:l])
-        # else:
-        #     for l in tqdm(range(0, k)):
-        #         for i in range(0, l - 1):
-        #             for j in range(i, l):
-        #                 covariance_contrib[l] += np.mean(
-        #                     corrdiff[:, i] * corrdiff[:, j]
-        #                 )
+                covariance_contrib[l] = (covariance_contrib[l - 1] + np.sum(cov[l, 0:l])) / (M - 1)
 
     else:
         covariance_contrib = 0

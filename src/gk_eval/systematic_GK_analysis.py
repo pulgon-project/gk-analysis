@@ -281,9 +281,6 @@ def main():
         folds = [1]
     else:
         folds = args.folds
-        # let's do this manually to allow for different run lengths
-        # if args.independent:
-        #     folds = np.array(folds) * len(fname)
 
     if not args.nocepstral:
         plt.figure(1)
@@ -301,11 +298,6 @@ def main():
                         0, n_steps, fold + 1, dtype=int
                     )[1:]
                     selected_time_conv = corresponding_time_conv
-                    # selected_time_conv = np.array(
-                    #     np.linspace(0, len(corresponding_time_conv) - 1, num_tests)
-                    # ).astype(int)
-
-                    # selected_time_conv = corresponding_time_conv[selected_time_conv]
                 else:
                     selected_time_conv = time_conv
 
@@ -403,7 +395,7 @@ def main():
         plt.xlabel(TIME_LABEL)
         plt.ylabel(KAPPA_LABEL)
         plt.savefig(f"kappa_0_time_convergence{file_suffix}.pdf")
-        plt.clf()
+        
 
         cut_conv = np.linspace(0, args.cutoff, num_c_tests + 1)[1:]
         print(cut_conv)
@@ -485,8 +477,6 @@ def main():
     kappa_errs = {}
     if not args.nohcacf:
         hcacf_extract_values = args.hfacf_extract
-        if not args.fast:
-            plt.figure(7)
         for fold in folds:
             kappas[fold] = {}
             kappa_errs[fold] = {}
@@ -495,8 +485,6 @@ def main():
                 kappa_errs[fold][hcacf_val] = []
 
             if not args.full_fold:
-                kappas = []
-                kappa_errs = []
                 with matplotlib.backends.backend_pdf.PdfPages(
                     f"HCACF_analysis_time_convergence_folds{fold}.pdf"
                 ) as pdf:
@@ -516,10 +504,10 @@ def main():
                         plt.close(fig)
                         for hcacf_val in hcacf_extract_values:
                             kappas[fold][hcacf_val].append(
-                                kappa[int(len(kappa) * [hcacf_val])]
+                                kappa[int(len(kappa) * hcacf_val)]
                             )
                             kappa_errs[fold][hcacf_val].append(
-                                kappa_err[int(len(kappa) * [hcacf_val])]
+                                kappa_err[int(len(kappa) * hcacf_val)]
                             )
 
                     for hcacf_val in hcacf_extract_values:
@@ -532,7 +520,7 @@ def main():
                             ],
                         )
             elif args.full_fold:
-                # this is the more reasonable approach for the direct evaluation
+                # this is the more reasonable approach for the direct evaluation for multiple independent simulations
                 with matplotlib.backends.backend_pdf.PdfPages(
                     f"HCACF_analysis_time_convergence_full_folds{fold}.pdf"
                 ) as pdf:
@@ -572,11 +560,14 @@ def main():
                         )
         conv_fig = plt.figure()
         for hcacf_val in hcacf_extract_values:
-
             for fold in folds:
-                corresponding_time_conv = np.linspace(0, n_steps, fold + 1, dtype=int)[
-                    1:
-                ]
+
+                if args.full_fold:
+                    corresponding_time_conv = np.linspace(0, n_steps, fold + 1, dtype=int)[
+                        1:
+                    ]
+                else:
+                    corresponding_time_conv = time_conv
                 plt.plot(
                     corresponding_time_conv * args.delta_t / 1e6,
                     kappas[fold][hcacf_val],
@@ -594,7 +585,8 @@ def main():
                 plt.savefig(
                     f"kappa_time_convergence_HCACF_fullex_{hcacf_val}{file_suffix}.pdf"
                 )
-            conv_fig.clf()
+            if hcacf_val != hcacf_extract_values[-1]:
+                conv_fig.clf()
 
     if not args.noshow:
         plt.show()

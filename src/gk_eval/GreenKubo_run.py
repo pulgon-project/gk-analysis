@@ -35,7 +35,7 @@ import gk_eval.uncertainty_tools as ut
 
 KAPPA_LABEL = "$\kappa$ / $\mathrm{W\,m^{-1}\,K^{-1}}$"
 HFACF_LABEL = "HFACF / GW$^2\,$m$^{-4}$"
-TIME_LABEL = "time / ns"
+TIME_LABEL = "$t$ / ns"
 
 
 def calc_spectrum(
@@ -288,7 +288,7 @@ class GreenKubo_run:
         self.time_index = np.array(range(len(self.temp))) * self.dt
         self.flux_force = flux_data[:, 0 : (self.n_cart)] / self.volume
         self.flux_pot = (
-            flux_data[:, (self.n_cart + 1) : (self.n_cart + self.n_cart)] / self.volume
+            flux_data[:, (self.n_cart) : (self.n_cart + self.n_cart)] / self.volume
         )
         self.flux_int = flux_data[
             :, (self.n_cart * 2) : (self.n_cart * 2 + self.n_cart)
@@ -351,8 +351,8 @@ class GreenKubo_run:
         )
         interval_freqs = np.linspace(0, max(self.freqs), 50)
         plt.xlim([0, max(self.freqs)])
-        plt.xlabel("frequency / THz")
-        plt.ylabel("$\\bar{S}(f)$ / $\mathrm{Wm^{-1}K^{-1}}$")
+        plt.xlabel("$\\nu$ / THz")
+        plt.ylabel("$\\bar{S}(\\nu)$ / $\mathrm{Wm^{-1}K^{-1}}$")
         # plt.tight_layout()
 
         plt.sca(axs[1])
@@ -360,7 +360,7 @@ class GreenKubo_run:
         plt.xlim([0, self.P_star * 4])
         # plt.semilogy()
         plt.axvline(x=self.P_star, ls="--", c="r")
-        plt.xlabel("P")
+        plt.xlabel("$P$")
         plt.ylabel("cepstral coefficient")
 
         plt.sca(axs[2])
@@ -368,8 +368,8 @@ class GreenKubo_run:
         # plt.semilogy()
         plt.xlim([0, self.P_star * 4])
         plt.ylim([np.min(self.aic) * 0.9, np.min(self.aic) * 1.5])
-        plt.xlabel("P")
-        plt.ylabel("AIC$_c$")
+        plt.xlabel("$P$")
+        plt.ylabel("AIC$_\mathrm{c}$")
         plt.axvline(self.P_star, color="red", ls="--")
         plt.axhline(np.min(self.aic), color="red", ls="--")
 
@@ -382,7 +382,7 @@ class GreenKubo_run:
             self.kappas[:num_2_plot] + self.kappa_errs[:num_2_plot],
             alpha=0.3,
         )
-        plt.axvline(x=self.P_star, ls="--", c="r", label="optimal P")
+        plt.axvline(x=self.P_star, ls="--", c="r", label="optimal $P$")
         if self.kappa_averaged is not None:
             plt.axhline(y=self.kappa_averaged, ls="--", c="g", label="model averaging")
             plt.axhspan(
@@ -392,15 +392,15 @@ class GreenKubo_run:
                 color="g",
             )
         plt.legend(fontsize=10)
-        plt.xlabel("P")
+        plt.xlabel("$P$")
         plt.ylabel(KAPPA_LABEL)
 
         if self.kappa_averaged is not None:
             plt.sca(axs[4])
             plt.plot(val_range, self.aic_weights[:num_2_plot], color="C2")
-            plt.axvline(x=self.P_star, ls="--", c="r", label="optimal P")
-            plt.xlabel("P")
-            plt.ylabel("AIC$_c$ weight $w_i$")
+            plt.axvline(x=self.P_star, ls="--", c="r", label="optimal $P$")
+            plt.xlabel("$P$")
+            plt.ylabel("AIC$_\mathrm{c}$ weight $w_i$")
 
         plt.sca(axs[5])
         plt.plot(
@@ -425,7 +425,7 @@ class GreenKubo_run:
                 plt.plot(
                     log_freqs[log_freqs >= 0],
                     log_spec_from_cepstral[log_freqs >= 0],
-                    label=f"P = {P}",
+                    label=f"$P = {P}$",
                 )
         plt.legend(fontsize="x-small")
         plt.xlim([0, max(self.freqs)])
@@ -438,7 +438,7 @@ class GreenKubo_run:
                 log_freqs[log_freqs >= 0],
                 np.exp(log_spec_from_cepstral[log_freqs >= 0] - self.L_0) * unit_factor,
                 color="r",
-                label="optimal P",
+                label="optimal $P$",
             )
             plt.legend(fontsize=10)
 

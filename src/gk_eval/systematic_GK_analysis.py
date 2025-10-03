@@ -23,6 +23,28 @@ import numpy as np
 import argparse
 
 
+def extract_direct(hcacf_extract_values, kappa, kappa_err, hfacf_ravg, N):
+    kappas = []
+    kappa_errs = []
+    for hcacf_val in hcacf_extract_values:
+        if hfacf_ravg:
+            xvals = np.array(range(len(kappa)))[int(N / 2) : int(-N / 2) + 1]
+            if len(xvals) > 0:
+                mean = np.convolve(kappa, np.ones(N) / N, mode="valid")
+                mean_sq = np.convolve(kappa**2, np.ones(N) / N, mode="valid")
+                var = np.clip(mean_sq - mean**2, 0, None)
+                kappa = mean
+                kappa_err = np.sqrt(var) / np.sqrt(N)
+            else:
+                print("WARNING: cannot compute running average, not enough data")
+
+        kappas.append(kappa[int(len(kappa) * hcacf_val)])
+        kappa_errs.append(kappa_err[int(len(kappa_err) * hcacf_val)])
+
+    return kappas, kappa_errs
+        
+
+
 def main():
     parser = argparse.ArgumentParser(description="Compute kappa from the thermal flux")
     parser.add_argument(
@@ -186,6 +208,20 @@ def main():
         nargs="*",
         default=[0.5],
         help="at which fraction of the spectrum is the thermal conductivity obtained",
+    )
+    parser.add_argument(
+        "--convolve_window",
+        dest="convolve_window",
+        type=int,
+        default=100,
+        help="window for running average",
+    )
+    parser.add_argument(
+        "--hfacf_ravg",
+        dest="hfacf_ravg",
+        action="store_true",
+        default=False,
+        help="use a running average to obtain the thermal conductivity at hfacf_extract values",
     )
     parser.add_argument(
         "--fmod",
@@ -395,7 +431,6 @@ def main():
         plt.xlabel(TIME_LABEL)
         plt.ylabel(KAPPA_LABEL)
         plt.savefig(f"kappa_0_time_convergence{file_suffix}.pdf")
-        
 
         cut_conv = np.linspace(0, args.cutoff, num_c_tests + 1)[1:]
         print(cut_conv)
@@ -502,17 +537,17 @@ def main():
                         pdf.savefig(fig)
                         # plt.clf()
                         plt.close(fig)
-                        for hcacf_val in hcacf_extract_values:
-                            kappas[fold][hcacf_val].append(
-                                kappa[int(len(kappa) * hcacf_val)]
-                            )
-                            kappa_errs[fold][hcacf_val].append(
-                                kappa_err[int(len(kappa) * hcacf_val)]
-                            )
+                        ks, kes = extract_direct(hcacf_extract_values, kappa, kappa_err, args.hfacf_ravg, args.convolve_window)
+                        kappas[fold][hcacf_val].append(ks)
+                        kappa_errs[fold][hcacf_val].append(kes)
 
                     for hcacf_val in hcacf_extract_values:
+                        if args.hfacf_ravg:
+                            hfacf_fname = f"kappa_time_convergence_HCACF_ex_{hcacf_val}_{fold}_ravg.txt"
+                        else:
+                            hfacf_fname = f"kappa_time_convergence_HCACF_ex_{hcacf_val}_{fold}.txt"
                         np.savetxt(
-                            f"kappa_time_convergence_HCACF_ex_{hcacf_val}_{fold}.txt",
+                            hfacf_fname,
                             np.c_[
                                 time_conv * args.delta_t,
                                 kappas[fold][hcacf_val],
@@ -541,17 +576,17 @@ def main():
                         pdf.savefig(fig)
                         # plt.clf()
                         plt.close(fig)
+                        ks, kes = extract_direct(hcacf_extract_values, kappa, kappa_err, args.hfacf_ravg, args.convolve_window)
+                        kappas[fold][hcacf_val].append(ks)
+                        kappa_errs[fold][hcacf_val].append(kes)
 
-                        for hcacf_val in hcacf_extract_values:
-                            kappa_errs[fold][hcacf_val].append(
-                                kappa_err[int(len(kappa) * hcacf_val)]
-                            )
-                            kappas[fold][hcacf_val].append(
-                                kappa[int(len(kappa) * hcacf_val)]
-                            )
                     for hcacf_val in hcacf_extract_values:
+                        if args.hfacf_ravg:
+                            hfacf_fname = f"kappa_time_convergence_HCACF_full_ex_{hcacf_val}_{fold}_ravg.txt"
+                        else:
+                            hfacf_fname = f"kappa_time_convergence_HCACF_full_ex_{hcacf_val}_{fold}.txt"
                         np.savetxt(
-                            f"kappa_time_convergence_HCACF_full_ex_{hcacf_val}_{fold}.txt",
+                            hfacf_fname,
                             np.c_[
                                 corresponding_time_conv * args.delta_t,
                                 kappas[fold][hcacf_val],
@@ -563,9 +598,9 @@ def main():
             for fold in folds:
 
                 if args.full_fold:
-                    corresponding_time_conv = np.linspace(0, n_steps, fold + 1, dtype=int)[
-                        1:
-                    ]
+                    corresponding_time_conv = np.linspace(
+                        0, n_steps, fold + 1, dtype=int
+                    )[1:]
                 else:
                     corresponding_time_conv = time_conv
                 plt.plot(

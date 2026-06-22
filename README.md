@@ -2,6 +2,9 @@
 
 A package to evaluate Green-Kubo simulations including cepstral and uncertainty analysis. The units are set up for the thermal conductivity. However, there is no reason to assume that the implemented approaches would not work for other transport quantities.
 
+This code is discussed in more detail in the accompanying paper in S. Wieser, Y.-J. Cen, G. K. H. Madsen, and J. Carrete, "Accelerating First-Principles Molecular-Dynamics Thermal Conductivity Calculations for Complex Systems," J. Chem. Theory Comput., vol. 22, no. 1, pp. 513–527, Jan. 2026, doi: 10.1021/acs.jctc.5c01525. Please consult it for more details.
+
+
 ## Evaluate Green-Kubo integrals using various statistical approaches
 
 Implemented approaches:

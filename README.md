@@ -87,7 +87,7 @@ kappa, kappa_err, fig = gkrun.analyze_HCACF_integral(folds=fold)
 kappa_kute, kappa_unc_kute, fig_kute = gkrun.analyze_kute(folds=fold)
 results_dict = gkrun.kute_results
 
-# analysis with the simplified Euler integral and uncertainties including the covariance matrix
+# analysis with the simplified Euler integral and uncertainty propagation including the covariance matrix
 kappa_euler, kappa_unc_euler, fig_euler = gkrun.analyze_euler(folds=fold)
 
 

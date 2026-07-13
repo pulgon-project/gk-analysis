@@ -158,7 +158,7 @@ class GreenKubo_run:
         self.mean_corr = mean_corr
         self.atoms = ase.io.read(atoms_file)
         if nw:
-            from gk_eval.struct.nanowire import Nanowire
+            from gk_analysis.struct.nanowire import Nanowire
 
             self.nw = Nanowire(self.atoms)
             # assuming the heat flux was already divided by this volume

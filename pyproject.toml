@@ -27,4 +27,4 @@ where = ["./src"]
 version = {attr = "gk_analysis.__version__"}
 
 [project.scripts]
-systematic_GK_analysis = "gk_eval.systematic_GK_analysis:main"
+systematic_GK_analysis = "gk_analysis.systematic_GK_analysis:main"

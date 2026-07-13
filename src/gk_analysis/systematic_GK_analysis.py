@@ -15,7 +15,7 @@
 # implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
-from gk_eval.GreenKubo_run import GreenKubo_run, KAPPA_LABEL, TIME_LABEL
+from gk_analysis.GreenKubo_run import GreenKubo_run, KAPPA_LABEL, TIME_LABEL
 import matplotlib.pyplot as plt
 import matplotlib
 import sys

@@ -1,4 +1,4 @@
-# GK_eval_cepstral
+# GK_analysis
 
 A package to evaluate Green-Kubo simulations including cepstral and uncertainty analysis. The units are set up for the thermal conductivity. However, there is no reason to assume that the implemented approaches would not work for other transport quantities.
 
@@ -58,7 +58,7 @@ The primary class to analyse Green-Kubo calculations is provided in the class `G
 
 
 ```python
-from gk_eval.GreenKubo_run import GreenKubo_run
+from gk_analysis.GreenKubo_run import GreenKubo_run
 fold = len(heat_flux_path_list)
 gkrun = GreenKubo_run(
     heat_flux_path_list,

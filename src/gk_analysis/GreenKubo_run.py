@@ -30,7 +30,7 @@ from scipy.special import polygamma, digamma
 import matplotlib.pyplot as plt
 import matplotlib.backends.backend_pdf
 import tqdm
-import gk_eval.uncertainty_tools as ut
+import gk_analysis.uncertainty_tools as ut
 
 
 KAPPA_LABEL = "$\kappa$ / $\mathrm{W\,m^{-1}\,K^{-1}}$"

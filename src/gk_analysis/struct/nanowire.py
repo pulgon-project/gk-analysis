@@ -16,7 +16,7 @@ from ase.atoms import Atoms
 from ase.data.vdw_alvarez import vdw_radii
 import numpy as np
 import ase.io
-from gk_eval.struct.symmetry import Symmetry
+from gk_analysis.struct.symmetry import Symmetry
 
 
 class Nanowire(Atoms):

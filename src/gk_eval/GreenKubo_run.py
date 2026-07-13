@@ -119,6 +119,7 @@ class GreenKubo_run:
         independent_flux=False,
         fmod=1,
         hf_lammps=False,
+        mean_corr=False,
     ):
         """
         Initializes a GreenKubo_run object.
@@ -154,6 +155,7 @@ class GreenKubo_run:
         self.independent_flux = independent_flux
         self.fmod = fmod
         self.hf_lammps = hf_lammps
+        self.mean_corr = mean_corr
         self.atoms = ase.io.read(atoms_file)
         if nw:
             from gk_eval.struct.nanowire import Nanowire
@@ -228,12 +230,16 @@ class GreenKubo_run:
                 cutnum = data.shape[0] % self.fmod
                 if cutnum != 0:
                     data = data[:-cutnum]
+                if self.mean_corr:
+                    data[:, 1:] = data[:, 1:] - np.mean(data[:, 1:], axis=0)
                 self.flens = [len(data)]
             else:
                 ndata = np.loadtxt(ff, skiprows=1, max_rows=max_rows[fid])
                 cutnum = ndata[skip:].shape[0] % self.fmod
                 if cutnum != 0:
                     ndata = ndata[:-cutnum]
+                if self.mean_corr:
+                    ndata[:, 1:] = ndata[:, 1:] - np.mean(ndata[:, 1:], axis=0)
                 data = np.vstack(
                     (
                         data,
@@ -266,7 +272,8 @@ class GreenKubo_run:
         self.flux = self.flux[:, (col_ind - 1) : (col_ind - 1 + self.n_cart)]
 
         if self.hf_lammps:
-            self.flux = self.flux / self.volume
+            print(self.volume, "volume")
+            self.flux = self.flux / self.atoms.get_volume()
 
     def read_flux_components(
         self, flux_comp_file, max_rows=None, take_every=1, full_flux=False
@@ -302,7 +309,7 @@ class GreenKubo_run:
             self.flux = self.flux_int
 
         if self.hf_lammps:
-            self.flux = self.flux / self.volume
+            self.flux = self.flux / self.atoms.get_volume()
 
     def create_plot_figures(
         self,
@@ -344,6 +351,10 @@ class GreenKubo_run:
         unit_factor = self.SI_PREFACTOR * self.prefactor / 2
         plt.sca(axs[0])
         num_2_plot = self.P_star * 4
+        if self.min_plateau >= num_2_plot:
+            num_2_plot = self.min_plateau * 2
+        if num_2_plot > len(self.kappas):
+            num_2_plot = len(self.kappas)
         plt.plot(
             self.freqs[self.freqs >= 0],
             self.spectra[self.freqs >= 0] * unit_factor,
@@ -383,6 +394,8 @@ class GreenKubo_run:
             alpha=0.3,
         )
         plt.axvline(x=self.P_star, ls="--", c="r", label="optimal $P$")
+        if self.min_plateau > 0:
+            plt.axvline(x=self.min_plateau, ls="--", c="orange", label="min plateau")
         if self.kappa_averaged is not None:
             plt.axhline(y=self.kappa_averaged, ls="--", c="g", label="model averaging")
             plt.axhspan(
@@ -551,7 +564,8 @@ class GreenKubo_run:
         spectra = spectra[0, 0, :]
         self.freqs = freqs
         self.spectra = spectra
-
+        # plt.plot(spectra)
+        # plt.show()
         # for now use single component
         n_components = 1
         ndf_chi = n_fluxes - n_components + 1
@@ -644,6 +658,34 @@ class GreenKubo_run:
                 ** 0.5
             )
 
+        # EXPERIMENTAL OPTIMIZATION OF DIFFERENCES
+        num_neighbors = 5
+
+        def kappa_diff_func(val):
+            # mval = np.mean(self.kappas[val-num_neighbors:val+num_neighbors])
+            # print(np.abs(self.kappas[val-num_neighbors:val+num_neighbors-1]))
+            return np.sum(
+                np.abs(
+                    self.kappas[val - num_neighbors : val + num_neighbors - 1]
+                    - self.kappas[val - num_neighbors + 1 : val + num_neighbors]
+                )
+            )
+        if np.min([len(self.kappas) - num_neighbors, self.P_star * 10]) - np.max([num_neighbors, self.P_star]) > 1:
+                
+            deviations = [
+                kappa_diff_func(val)
+                for val in range(
+                    np.max([num_neighbors, self.P_star]),
+                    np.min([len(self.kappas) - num_neighbors, self.P_star * 10]),
+                    1,
+                )
+            ]
+            # print(range(num_neighbors, len(self.kappas)-num_neighbors, 1),deviations)
+            self.min_plateau = np.argmin(deviations)+np.max([num_neighbors, self.P_star])
+            print("min diff:", self.min_plateau, self.kappas[self.min_plateau])
+        else:
+            self.min_plateau = 0
+
         self.kappa = kappas[P_star]
         self.kappa_err = kappa_errs[P_star]
 
@@ -651,7 +693,7 @@ class GreenKubo_run:
         print("thermal conductivity error:", self.kappa_err)
 
         if plot_results:
-            self.create_plot_pdf()
+            self.create_plot_figures()
         if model_averaging:
             return self.kappa_averaged, self.kappa_err_averaged
         else:
@@ -728,18 +770,22 @@ class GreenKubo_run:
         max_eval=None,
         newfig=True,
         raw_HCACF=False,
-        fast_mode=False,
         plot_ACF=True,
         plot_kappa=True,
+        **kwargs,
     ):
         """
         Analyzes the HCACF integral and visualizes the cumulative thermal conductivity.
 
-        Some aspects of it are identical to the kute variant. TODO: create proper functions for this
-
         Parameters :
             convolve_window (int, optional): The window size for the convolution. Defaults to 1000.
-            euler (bool, optional): Whether to use Euler's method for integration. Defaults to False.
+            mean_correction (bool, optional): Whether to apply a simple mean correction to the flux data (can lead to minor noise improvements). Not recommended. Defaults to False.
+            folds (int, optional): The number of folds to create (averaging over segments). Defaults to None (=1).
+            max_eval (int, optional): The maximum number of steps to evaluate. Defaults to None (all steps).
+            newfig (bool, optional): Whether to create a new figure. Defaults to True.
+            raw_HCACF (bool, optional): Whether to plot the raw HCACF. Defaults to False.
+            plot_ACF (bool, optional): Whether to plot the ACF. Defaults to True.
+            plot_kappa (bool, optional): Whether to plot the cumulative thermal conductivity. Defaults to True.
         """
         fluxes = self.fold_flux(
             folds=folds, mean_correction=mean_correction, max_eval=max_eval
@@ -800,6 +846,10 @@ class GreenKubo_run:
             self.volume / (self.kB * self.temperature**2) * self.SI_PREFACTOR
         )
 
+        self.hcacf = hcacf * self.HCACF_UNIT / 1e18
+
+        self.hcacf_unc = hcacf_uncertainty * self.HCACF_UNIT / 1e18
+        
         if newfig:
             fig = plt.figure()
         else:
@@ -827,17 +877,22 @@ class GreenKubo_run:
                 )
             if convolve_window is not None:
                 N = convolve_window
-                xvals = np.array(range(len(hcacf)))[int(N / 2) : int(-N / 2) + 1]
-                if len(xvals) > 0:
+                hcacf_mirrored = np.concatenate(
+                    (np.flip(hcacf[1:]), [hcacf[0]], hcacf[1:])
+                )
+                xvals = np.array(range(len(hcacf_mirrored)))[
+                    int(N / 2) : int(-N / 2) + 1
+                ] - (len(hcacf) - 0.5)
+                if len(xvals) > N:
                     convolution = (
-                        np.convolve(hcacf, np.ones(N) / N, mode="valid")
+                        np.convolve(hcacf_mirrored, np.ones(N) / N, mode="valid")
                         * self.HCACF_UNIT
                         / 1e18
                     )
 
                     ax2.plot(
-                        xvals * self.dt * 1e3 / 1e6,
-                        convolution,
+                        xvals[xvals >= 0] * self.dt * 1e3 / 1e6,
+                        convolution[xvals >= 0],
                         c="green",
                         alpha=0.5,
                         label="HFACF (smooth)",
@@ -874,9 +929,9 @@ class GreenKubo_run:
         mean_correction=False,
         folds=None,
         max_eval=None,
-        raw_HCACF=False,
         fast_mode=False,
         kute_test_mode=False,
+        **kwargs,
     ):
         """
         following paper: 10.1021/acs.jcim.4c02219
@@ -1039,6 +1094,8 @@ class GreenKubo_run:
         hcacf *= self.HCACF_UNIT / 1e18
         hcacf_uncertainty *= self.HCACF_UNIT / 1e18
         individual_corrs *= self.HCACF_UNIT / 1e18
+        self.hcacf = hcacf
+        self.hcacf_unc = hcacf_uncertainty
         fig, axs = plt.subplots(2, 2, sharex=True)
 
         plt.sca(axs[0, 0])
@@ -1143,13 +1200,9 @@ class GreenKubo_run:
 
     def analyze_euler(
         self,
-        convolve_window=1000,
-        mean_correction=False,
         folds=None,
         max_eval=None,
-        raw_HCACF=False,
-        fast_mode=False,
-        kute_test_mode=False,
+        **kwargs,
     ):
         """
         Method to analyze the ACF integral using Euler's method with uncertainty estimation based on the covariance matrix
@@ -1163,6 +1216,8 @@ class GreenKubo_run:
             fluxes, num_pieces=None
         )
 
+        self.hcacf = corrfunc * self.HCACF_UNIT / 1e18
+        self.hcacf_unc = u_corr * self.HCACF_UNIT / 1e18
         integral, u_integral, n_contrib, cov_contrib = ut.calc_euler_integral(
             corrfunc,
             dt,

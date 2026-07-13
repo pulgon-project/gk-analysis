@@ -24,8 +24,8 @@ import argparse
 
 
 def extract_direct(hcacf_extract_values, kappa, kappa_err, hfacf_ravg, N):
-    kappas = []
-    kappa_errs = []
+    kappas = {}
+    kappa_errs = {}
     for hcacf_val in hcacf_extract_values:
         if hfacf_ravg:
             xvals = np.array(range(len(kappa)))[int(N / 2) : int(-N / 2) + 1]
@@ -37,9 +37,8 @@ def extract_direct(hcacf_extract_values, kappa, kappa_err, hfacf_ravg, N):
                 kappa_err = np.sqrt(var) / np.sqrt(N)
             else:
                 print("WARNING: cannot compute running average, not enough data")
-
-        kappas.append(kappa[int(len(kappa) * hcacf_val)])
-        kappa_errs.append(kappa_err[int(len(kappa_err) * hcacf_val)])
+        kappas[hcacf_val] = (kappa[int(len(kappa) * hcacf_val)])
+        kappa_errs[hcacf_val] = (kappa_err[int(len(kappa_err) * hcacf_val)])
 
     return kappas, kappa_errs
         
@@ -266,6 +265,27 @@ def main():
         help="use definition of heat flux as in lammps tutorial (volume)",
     )
     parser.add_argument(
+        "--mean_corr",
+        dest="mean_corr",
+        action="store_true",
+        default=False,
+        help="subtract the mean of the flux before forming the correlation. (can fix strange offsets from shorter runs)",
+    )
+    parser.add_argument(
+        "--write_kappa_curves",
+        dest="write_kappa_curves",
+        action="store_true",
+        default=False,
+        help="write the raw hfacf integral curves with errors",
+    )
+    parser.add_argument(
+        "--write_hfacf_curves",
+        dest="write_hfacf_curves",
+        action="store_true",
+        default=False,
+        help="write the raw hfacf curves with errors",
+    )
+    parser.add_argument(
         "-d", "--delta_t", type=float, default=1, help="time step in fs"
     )
     args = parser.parse_args()
@@ -304,6 +324,7 @@ def main():
         independent_flux=args.independent,
         fmod=args.fmod,
         hf_lammps=args.hf_lammps,
+        mean_corr=args.mean_corr,
     )
     print("read run")
     n_steps = len(gkrun.temp)
@@ -532,14 +553,34 @@ def main():
                             fast_mode=args.fast,
                             raw_HCACF=args.raw_HCACF,
                         )
+
+                        if args.write_kappa_curves:
+                            np.savetxt(
+                                f"kappa_time_convergence_HCACF_full_ex_t_{val}_{fold}.txt",
+                                np.c_[
+                                    np.asarray(range(len(kappa))) * args.delta_t,
+                                    kappa,
+                                    kappa_err,
+                                ],
+                            )
+                        if args.write_hfacf_curves:
+                            np.savetxt(
+                                f"HFACF_time_convergence_HCACF_full_ex_t_{val}_{fold}.txt",
+                                np.c_[
+                                    np.asarray(range(len(gkrun.hcacf))) * args.delta_t,
+                                    gkrun.hcacf,
+                                    gkrun.hcacf_unc,
+                                ],
+                            )
                         fig.suptitle(f"n_step: {val}")
                         plt.tight_layout()
                         pdf.savefig(fig)
                         # plt.clf()
                         plt.close(fig)
                         ks, kes = extract_direct(hcacf_extract_values, kappa, kappa_err, args.hfacf_ravg, args.convolve_window)
-                        kappas[fold][hcacf_val].append(ks)
-                        kappa_errs[fold][hcacf_val].append(kes)
+                        for hcacf_val in hcacf_extract_values:
+                            kappas[fold][hcacf_val] = ks[hcacf_val]
+                            kappa_errs[fold][hcacf_val] = kes[hcacf_val]
 
                     for hcacf_val in hcacf_extract_values:
                         if args.hfacf_ravg:
@@ -571,20 +612,40 @@ def main():
                             mean_correction=False,
                             fast_mode=args.fast,
                         )
+                        if args.write_kappa_curves:
+                            np.savetxt(
+                                f"kappa_time_convergence_HCACF_full_ex_t_{val}_{fold}.txt",
+                                np.c_[
+                                    np.asarray(range(len(kappa))) * args.delta_t,
+                                    kappa,
+                                    kappa_err,
+                                ],
+                            )
+                        if args.write_hfacf_curves:
+                            np.savetxt(
+                                f"HFACF_time_convergence_HCACF_full_ex_t_{val}_{fold}.txt",
+                                np.c_[
+                                    np.asarray(range(len(gkrun.hcacf))) * args.delta_t,
+                                    gkrun.hcacf,
+                                    gkrun.hcacf_unc,
+                                ],
+                            )
                         fig.suptitle(f"n_step: {val}")
                         plt.tight_layout()
                         pdf.savefig(fig)
                         # plt.clf()
                         plt.close(fig)
                         ks, kes = extract_direct(hcacf_extract_values, kappa, kappa_err, args.hfacf_ravg, args.convolve_window)
-                        kappas[fold][hcacf_val].append(ks)
-                        kappa_errs[fold][hcacf_val].append(kes)
+                        for hcacf_val in hcacf_extract_values:
+                            kappas[fold][hcacf_val].append(ks[hcacf_val])
+                            kappa_errs[fold][hcacf_val].append(kes[hcacf_val])
 
                     for hcacf_val in hcacf_extract_values:
                         if args.hfacf_ravg:
                             hfacf_fname = f"kappa_time_convergence_HCACF_full_ex_{hcacf_val}_{fold}_ravg.txt"
                         else:
                             hfacf_fname = f"kappa_time_convergence_HCACF_full_ex_{hcacf_val}_{fold}.txt"
+                        
                         np.savetxt(
                             hfacf_fname,
                             np.c_[

@@ -197,3 +197,8 @@ cython_debug/
 .vscode/
 test_zone
 build/
+
+CLAUDE.md
+docs/agents
+temp
+.scratch

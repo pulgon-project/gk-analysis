@@ -502,7 +502,6 @@ class GreenKubo_run:
             .mean()
             .to_numpy()
         )
-        plt.plot(freqs, filtered_spectrum)
 
         return 10.0
 

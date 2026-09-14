@@ -13,18 +13,35 @@ requires-python = ">=3.8"
 dependencies = [
     "ase",
     "matplotlib",
+    "numba",
     "numpy",
+    "pandas",
     "scipy",
     "tqdm"
 ]
 readme = "README.md"
 dynamic = ["version"]
 
+[project.optional-dependencies]
+struct = [
+    "pymatgen",
+    "spglib",
+]
+test = [
+    "pymatgen",
+    "pytest",
+    "pytest-cov",
+    "spglib",
+]
+
 [tool.setuptools.packages.find]
 where = ["./src"]
 
 [tool.setuptools.dynamic]
 version = {attr = "gk_analysis.__version__"}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [project.scripts]
 systematic_GK_analysis = "gk_analysis.systematic_GK_analysis:main"

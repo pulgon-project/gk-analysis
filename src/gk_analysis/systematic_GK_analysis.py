@@ -579,8 +579,8 @@ def main():
                         plt.close(fig)
                         ks, kes = extract_direct(hcacf_extract_values, kappa, kappa_err, args.hfacf_ravg, args.convolve_window)
                         for hcacf_val in hcacf_extract_values:
-                            kappas[fold][hcacf_val] = ks[hcacf_val]
-                            kappa_errs[fold][hcacf_val] = kes[hcacf_val]
+                            kappas[fold][hcacf_val].append(ks[hcacf_val])
+                            kappa_errs[fold][hcacf_val].append(kes[hcacf_val])
 
                     for hcacf_val in hcacf_extract_values:
                         if args.hfacf_ravg:

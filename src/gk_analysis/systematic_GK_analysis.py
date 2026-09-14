@@ -24,19 +24,20 @@ import argparse
 
 
 def extract_direct(hcacf_extract_values, kappa, kappa_err, hfacf_ravg, N):
+    if hfacf_ravg:
+        xvals = np.array(range(len(kappa)))[int(N / 2) : int(-N / 2) + 1]
+        if len(xvals) > 0:
+            mean = np.convolve(kappa, np.ones(N) / N, mode="valid")
+            mean_sq = np.convolve(kappa**2, np.ones(N) / N, mode="valid")
+            var = np.clip(mean_sq - mean**2, 0, None)
+            kappa = mean
+            kappa_err = np.sqrt(var) / np.sqrt(N)
+        else:
+            print("WARNING: cannot compute running average, not enough data")
+
     kappas = {}
     kappa_errs = {}
     for hcacf_val in hcacf_extract_values:
-        if hfacf_ravg:
-            xvals = np.array(range(len(kappa)))[int(N / 2) : int(-N / 2) + 1]
-            if len(xvals) > 0:
-                mean = np.convolve(kappa, np.ones(N) / N, mode="valid")
-                mean_sq = np.convolve(kappa**2, np.ones(N) / N, mode="valid")
-                var = np.clip(mean_sq - mean**2, 0, None)
-                kappa = mean
-                kappa_err = np.sqrt(var) / np.sqrt(N)
-            else:
-                print("WARNING: cannot compute running average, not enough data")
         kappas[hcacf_val] = (kappa[int((len(kappa) - 1) * hcacf_val)])
         kappa_errs[hcacf_val] = (kappa_err[int((len(kappa_err) - 1) * hcacf_val)])
 

@@ -57,24 +57,30 @@ def test_extract_direct_running_average_warns_when_not_enough_data(capsys):
     assert errs[0.5] == kappa_err[idx]
 
 
-def test_extract_direct_hfacf_ravg_over_smooths_later_fractions_in_same_call():
-    """Known bug: inside the loop over hcacf_extract_values, `kappa`/`kappa_err`
-    are reassigned to the smoothed mean/uncertainty (`kappa = mean`,
-    `kappa_err = ...`). With hfacf_ravg=True and more than one requested
-    fraction, every fraction after the first gets the running average
-    applied AGAIN on top of the already-smoothed array from the previous
-    iteration, instead of each fraction being computed independently from
-    the original raw data. This test pins that current, order-dependent
-    behaviour rather than asserting the (presumably intended) independence."""
+def test_extract_direct_hfacf_ravg_fractions_are_independent_of_call_order():
+    """Regression test: the running average used to be recomputed inside
+    the loop over hcacf_extract_values, reassigning `kappa`/`kappa_err` to
+    the smoothed mean/uncertainty on every iteration. With hfacf_ravg=True
+    and more than one requested fraction, this meant every fraction after
+    the first got smoothed again on top of the already-smoothed array.
+    Fixed by computing the running average once, before the loop."""
     rng = np.random.default_rng(0)
     n = 50
     N = 10
     kappa = rng.normal(loc=5.0, scale=0.1, size=n)
     kappa_err = np.full(n, 0.2)
 
-    multi, _ = extract_direct([0.25, 0.75], kappa.copy(), kappa_err.copy(), hfacf_ravg=True, N=N)
-    single_75, _ = extract_direct([0.75], kappa.copy(), kappa_err.copy(), hfacf_ravg=True, N=N)
+    multi, multi_errs = extract_direct(
+        [0.25, 0.75], kappa.copy(), kappa_err.copy(), hfacf_ravg=True, N=N
+    )
+    single_25, single_25_errs = extract_direct(
+        [0.25], kappa.copy(), kappa_err.copy(), hfacf_ravg=True, N=N
+    )
+    single_75, single_75_errs = extract_direct(
+        [0.75], kappa.copy(), kappa_err.copy(), hfacf_ravg=True, N=N
+    )
 
-    # the second fraction in a multi-fraction call does NOT match the same
-    # fraction computed on its own, because it was smoothed twice
-    assert multi[0.75] != pytest.approx(single_75[0.75])
+    assert multi[0.25] == pytest.approx(single_25[0.25])
+    assert multi[0.75] == pytest.approx(single_75[0.75])
+    assert multi_errs[0.25] == pytest.approx(single_25_errs[0.25])
+    assert multi_errs[0.75] == pytest.approx(single_75_errs[0.75])

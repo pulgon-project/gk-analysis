@@ -404,17 +404,3 @@ class Nanowire(Atoms):
         dists = self.get_all_distances(mic=True)
         neighbors = np.sum(dists <= cutoff, axis=0)
         return neighbors
-
-    def get_CN_ASANN(self):
-        """
-        Returns the coordination number for each atom using the ASANN approach
-
-        Returns:
-            np.array: The coordination number for each atom in the nanowire.
-        """
-        from src.dockonsurf.ASANN import coordination_numbers
-
-        asann_CNs, asann_radii, asann_edges, vectors = coordination_numbers(
-            self.positions, pbc=True, cell_vectors=self.cell.array
-        )
-        return asann_CNs

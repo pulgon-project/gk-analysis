@@ -930,11 +930,18 @@ class GreenKubo_run:
         max_eval=None,
         fast_mode=False,
         kute_test_mode=False,
+        max_plot_points=1000,
         **kwargs,
     ):
         """
         following paper: 10.1021/acs.jcim.4c02219
         does not support cross-correlation yet
+
+        Parameters:
+            max_plot_points (int, optional): The maximum number of points to
+                plot for the per-fold cumulative traces (fast_mode=False).
+                The traces are downsampled by an integer stride so that
+                roughly this many points get plotted. Defaults to 1000.
         """
 
         if kute_test_mode:
@@ -1141,7 +1148,7 @@ class GreenKubo_run:
         plt.sca(axs[1, 0])
         plt.xlabel(TIME_LABEL)
         plt.ylabel(KAPPA_LABEL)
-        interval = int(len(xvals[:-1]) / 1000)
+        interval = max(1, int(len(xvals[:-1]) / max_plot_points))
         if not fast_mode:
             for i in range(num_fluxes):
                 plt.plot(xvals[:-1][::interval], individual_cumuls[i][::interval])
@@ -1181,8 +1188,8 @@ class GreenKubo_run:
         if kute_test_mode:
             plt.fill_between(
                 xvals[:-1],
-                weighted_integral + kute_uncertainty,
-                weighted_integral - kute_uncertainty,
+                weighted_integral + weighted_integral_uncertainty,
+                weighted_integral - weighted_integral_uncertainty,
                 alpha=0.3,
                 color="r",
             )

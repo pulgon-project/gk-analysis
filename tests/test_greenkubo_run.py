@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pytest
 from scipy.integrate import cumulative_trapezoid
@@ -508,25 +510,65 @@ def test_analyze_kute_fast_mode_result_keys_and_shapes(poscar_path, write_flux_f
     assert weighted_integral[-1] == pytest.approx(gk.kute_results["cumul"][-1])
 
 
-def test_analyze_kute_test_mode_currently_always_raises(poscar_path, write_flux_file, rng, chdir_tmp_path):
-    """Known bug (see BUGS.md): kute_test_mode=True is meant to exercise a
-    slow O(N^2) uncertainty recomputation and assert it agrees with the fast
-    vectorized formula. That numeric check does happen (and, separately,
-    passes -- see the "differences detected!" branch in the source), but a
-    few lines later the *plotting* code unconditionally evaluates
-    `weighted_integral + kute_uncertainty`, whose arrays differ in length by
-    one regardless of input size. So analyze_kute(kute_test_mode=True)
-    currently always raises before returning anything, and the fast/slow
-    agreement it computes internally is unobservable from the public API.
-    This test pins that current, broken behaviour.
-    """
-    n = 1500
+def test_analyze_kute_small_data_fast_mode_false_does_not_crash(
+    poscar_path, write_flux_file, rng, chdir_tmp_path
+):
+    """Regression test: analyze_kute(fast_mode=False) used to crash with
+    ValueError: slice step cannot be zero whenever the folded flux had
+    fewer than 1000 time steps, because the plotting downsample interval
+    was hardcoded to len(xvals[:-1]) // 1000. Fixed by introducing the
+    max_plot_points parameter and guarding the interval to be at least 1."""
+    n = 300  # fewer than 1000 folded steps
     data = np.column_stack([np.full(n, 300.0), rng.normal(scale=0.01, size=(n, 3))])
     path = write_flux_file(data)
     gk = GreenKubo_run(path, poscar_path, dt=1.0, n_cart=3)
 
-    with pytest.raises(ValueError, match="broadcast"):
-        gk.analyze_kute(kute_test_mode=True, convolve_window=50)
+    weighted_integral, weighted_integral_unc, fig = gk.analyze_kute(
+        fast_mode=False, convolve_window=50
+    )
+    assert weighted_integral.shape == (n - 1,)
+
+
+def test_analyze_kute_max_plot_points_is_adjustable(poscar_path, write_flux_file, rng, chdir_tmp_path):
+    n = 600
+    data = np.column_stack([np.full(n, 300.0), rng.normal(scale=0.01, size=(n, 3))])
+    path = write_flux_file(data)
+    gk = GreenKubo_run(path, poscar_path, dt=1.0, n_cart=3)
+
+    # an arbitrary, non-default value should not crash and should still
+    # complete the analysis
+    weighted_integral, _, _ = gk.analyze_kute(
+        fast_mode=False, convolve_window=50, max_plot_points=17
+    )
+    assert weighted_integral.shape == (n - 1,)
+
+
+def test_analyze_kute_test_mode_completes_and_agrees_with_fast_uncertainty(
+    poscar_path, write_flux_file, rng, chdir_tmp_path, capsys
+):
+    """kute_test_mode=True recomputes the weighted-integral uncertainty via
+    an explicit O(N^2) loop and asserts it agrees with the vectorized fast
+    formula (the source code itself checks this with np.allclose and prints
+    "differences detected!" plus saves differences.npy on mismatch).
+    Regression test for the fixed shape mismatch (weighted_integral vs.
+    kute_uncertainty differing in length by one) that used to make this
+    mode crash unconditionally before returning."""
+    n = 1500
+    data = np.column_stack([np.full(n, 300.0), rng.normal(scale=0.01, size=(n, 3))])
+    path = write_flux_file(data)
+
+    gk_fast = GreenKubo_run(path, poscar_path, dt=1.0, n_cart=3)
+    fast_integral, fast_unc, _ = gk_fast.analyze_kute(fast_mode=True, convolve_window=50)
+
+    gk_test = GreenKubo_run(path, poscar_path, dt=1.0, n_cart=3)
+    test_integral, test_unc, _ = gk_test.analyze_kute(kute_test_mode=True, convolve_window=50)
+
+    captured = capsys.readouterr()
+    assert "differences detected" not in captured.out
+    assert not os.path.exists("differences.npy")
+
+    assert np.allclose(fast_integral, test_integral)
+    assert np.allclose(fast_unc, test_unc)
 
 
 # ---------------------------------------------------------------------------

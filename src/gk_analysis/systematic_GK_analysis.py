@@ -37,8 +37,8 @@ def extract_direct(hcacf_extract_values, kappa, kappa_err, hfacf_ravg, N):
                 kappa_err = np.sqrt(var) / np.sqrt(N)
             else:
                 print("WARNING: cannot compute running average, not enough data")
-        kappas[hcacf_val] = (kappa[int(len(kappa) * hcacf_val)])
-        kappa_errs[hcacf_val] = (kappa_err[int(len(kappa_err) * hcacf_val)])
+        kappas[hcacf_val] = (kappa[int((len(kappa) - 1) * hcacf_val)])
+        kappa_errs[hcacf_val] = (kappa_err[int((len(kappa_err) - 1) * hcacf_val)])
 
     return kappas, kappa_errs
         

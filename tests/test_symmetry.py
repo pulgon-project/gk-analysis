@@ -11,52 +11,35 @@ from gk_analysis.struct.symmetry import Symmetry
 
 
 # ---------------------------------------------------------------------------
-# get_space_group: known bug (see BUGS.md)
-#
-# Symmetry.get_space_group() passes atoms.positions (Cartesian) to
-# spglib.get_spacegroup(), which expects fractional/scaled coordinates. For
-# a non-identity cell this silently returns the WRONG space group. The
-# tests below pin the actual (buggy) output for well-known structures --
-# NOT the textbook space group, which is what a correct implementation
-# would return (also asserted, via spglib directly, for contrast).
+# get_space_group
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    "kind,name,correct_symbol,correct_number",
+    "kind,name,expected_symbol,expected_number",
     [
         ("bcc", "Fe", "Im-3m", "229"),
         ("fcc", "Cu", "Fm-3m", "225"),
     ],
 )
-def test_get_space_group_is_wrong_for_cubic_cells(kind, name, correct_symbol, correct_number):
-    import spglib
-
+def test_get_space_group_matches_textbook_value_for_cubic_cells(
+    kind, name, expected_symbol, expected_number
+):
     atoms = bulk(name, kind, cubic=True)
 
-    # what a correct call (fractional coordinates) actually returns:
-    correct_cell = (atoms.cell.array, atoms.get_scaled_positions(), atoms.get_atomic_numbers())
-    correct = spglib.get_spacegroup(correct_cell, symprec=1e-5)
-    assert correct.split("(")[0].strip() == correct_symbol
-    assert correct.split("(")[1].split(")")[0] == correct_number
-
-    # what Symmetry actually returns, using Cartesian positions:
     sym = Symmetry(atoms)
-    assert sym.space_group_symbol != correct_symbol
-    assert sym.space_group_number != correct_number
+    # get_space_group() doesn't strip the raw spglib symbol, which carries a
+    # trailing space before "(<number>)" (e.g. "Im-3m ") -- not part of this fix.
+    assert sym.space_group_symbol.strip() == expected_symbol
+    assert sym.space_group_number == expected_number
 
 
-def test_get_space_group_diamond_si_primitive_cell_is_wrong():
-    import spglib
-
+def test_get_space_group_diamond_si_primitive_cell():
     atoms = bulk("Si", "diamond", a=5.43)
 
-    correct_cell = (atoms.cell.array, atoms.get_scaled_positions(), atoms.get_atomic_numbers())
-    correct = spglib.get_spacegroup(correct_cell, symprec=1e-5)
-    assert correct.split("(")[0].strip() == "Fd-3m"
-
     sym = Symmetry(atoms)
-    assert sym.space_group_symbol != "Fd-3m"
+    assert sym.space_group_symbol.strip() == "Fd-3m"
+    assert sym.space_group_number == "227"
 
 
 # ---------------------------------------------------------------------------

@@ -38,16 +38,13 @@ HFACF_LABEL = "HFACF / GW$^2\,$m$^{-4}$"
 TIME_LABEL = "$t$ / ns"
 
 
-def calc_spectrum(
-    fluxes: np.ndarray, delta_t: float, n_dim: int = 3, time_factor: float = 1.0
-):
+def calc_spectrum(fluxes: np.ndarray, delta_t: float, time_factor: float = 1.0):
     """
     Calculate the spectra of given fluxes.
 
     Parameters:
     fluxes (numpy array): Array of fluxes.
     delta_t (float): Time interval between flux measurements.
-    n_dim (int, optional): Number of dimensions. Defaults to 3.
 
     Returns:
     freqs (numpy array): Frequencies of the spectrum.
@@ -491,7 +488,7 @@ class GreenKubo_run:
         fluxes = flux.reshape((flux.shape[0], -1, self.n_cart)).transpose((1, 0, 2))
 
         freqs, ffts, spectra = calc_spectrum(
-            fluxes, self.dt, self.n_cart, time_factor=self.time_factor
+            fluxes, self.dt, time_factor=self.time_factor
         )
 
         print(np.shape(ffts))
@@ -559,7 +556,6 @@ class GreenKubo_run:
         freqs, ffts, spectra = calc_spectrum(
             resampled_fluxes,
             resampled_delta_t,
-            self.n_cart,
             time_factor=self.time_factor,
         )
         print(np.shape(spectra))

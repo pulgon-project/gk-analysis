@@ -84,7 +84,7 @@ class Symmetry:
 
         cell = (
             self.atoms.cell.array,
-            self.atoms.positions,
+            self.atoms.get_scaled_positions(),
             self.atoms.get_atomic_numbers(),
         )
 

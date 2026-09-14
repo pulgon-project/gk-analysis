@@ -20,7 +20,7 @@ def test_calc_spectrum_shapes_and_freqs():
     n_steps = 64
     dt = 0.5
     fluxes = np.zeros((2, n_steps, 3))
-    freqs, ffts, spectra = calc_spectrum(fluxes, dt, n_dim=3)
+    freqs, ffts, spectra = calc_spectrum(fluxes, dt)
 
     assert np.allclose(freqs, np.fft.fftfreq(n_steps, dt))
     assert ffts.shape == (2, n_steps, 3)
@@ -37,7 +37,7 @@ def test_calc_spectrum_single_tone_peak():
 
     fluxes = np.zeros((1, n, 3))
     fluxes[0, :, 0] = sine
-    freqs, ffts, spectra = calc_spectrum(fluxes, dt, n_dim=3)
+    freqs, ffts, spectra = calc_spectrum(fluxes, dt)
 
     power = np.abs(spectra[0, 0, :])
     positive = freqs >= 0
@@ -50,26 +50,12 @@ def test_calc_spectrum_white_noise_is_flat_on_average():
     n = 4096
     dt = 1.0
     fluxes = rng.normal(size=(1, n, 3))
-    freqs, ffts, spectra = calc_spectrum(fluxes, dt, n_dim=3)
+    freqs, ffts, spectra = calc_spectrum(fluxes, dt)
 
     power = np.real(spectra[0, 0, :])
     mean_power = np.mean(power)
     # a flat spectrum: individual bins shouldn't deviate wildly from the mean
     assert np.std(power) < 2 * mean_power
-
-
-def test_calc_spectrum_n_dim_argument_is_shadowed_by_actual_shape():
-    """Known bug (see BUGS.md): calc_spectrum's n_dim parameter is
-    immediately overwritten by `n_dim = fluxes.shape[-1]`, so the caller's
-    n_dim argument has no effect at all on the normalization -- it always
-    follows the actual last-axis size of `fluxes`, not the parameter."""
-    n_steps = 32
-    dt = 1.0
-    fluxes = np.ones((1, n_steps, 3))
-
-    _, _, spectra_arg_3 = calc_spectrum(fluxes, dt, n_dim=3)
-    _, _, spectra_arg_999 = calc_spectrum(fluxes, dt, n_dim=999)
-    assert np.allclose(spectra_arg_3, spectra_arg_999)
 
 
 # ---------------------------------------------------------------------------

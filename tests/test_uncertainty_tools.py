@@ -5,7 +5,7 @@ from gk_analysis import uncertainty_tools as ut
 
 
 # ---------------------------------------------------------------------------
-# calc_correlation / calc_correlation_old
+# calc_correlation
 # ---------------------------------------------------------------------------
 
 
@@ -73,36 +73,6 @@ def test_calc_correlation_corrdiff_sums_to_zero_across_pieces():
     assert np.allclose(np.sum(corrdiff, axis=0), 0.0, atol=1e-10)
 
 
-def test_calc_correlation_old_shape_and_constant_series():
-    """calc_correlation_old drops lag 0 relative to calc_correlation.
-
-    Known bug (see BUGS.md): its `contributions` normalizer is off by one
-    (`plen - k` instead of `plen - k - 1`), so it does NOT recover
-    series**2 for a constant series -- it systematically under-divides by
-    one extra sample. This test pins that actual, independently-derived
-    (from the true unnormalized sum) behaviour rather than asserting the
-    "should be series**2" property that only holds for `calc_correlation`.
-    """
-    num_pieces = 4
-    plen = 8
-    c = 1.75
-    data = np.full(num_pieces * plen, c)
-
-    corrfunc_old, unc_old, _, corrdiff_old = ut.calc_correlation_old(
-        data, num_pieces=num_pieces
-    )
-
-    assert corrfunc_old.shape == (plen - 1,)
-    assert corrdiff_old.shape == (num_pieces, plen - 1)
-
-    # unnormalized sum at lag m = c**2 * (plen - m); the code divides by
-    # (plen - k) for its k-th entry (m = k + 1), one too many samples.
-    lags = np.arange(1, plen)
-    expected = c**2 * (plen - lags) / (plen - (lags - 1))
-    assert np.allclose(corrfunc_old, expected)
-    assert np.allclose(unc_old, 0.0)
-
-
 # ---------------------------------------------------------------------------
 # compute_cov_contrib
 # ---------------------------------------------------------------------------
@@ -156,8 +126,7 @@ def test_calc_euler_integral_include_cov_false_ignores_corrdiff():
 
 
 def test_calc_euler_integral_fast_cov_matches_compute_cov_contrib():
-    """fast_cov=True must be consistent with compute_cov_contrib itself,
-    independently of the (buggy, see BUGS.md) fast_cov=False branch."""
+    """fast_cov=True must be consistent with compute_cov_contrib itself."""
     rng = np.random.default_rng(6)
     n = 8
     data = rng.normal(size=n)
@@ -185,12 +154,9 @@ def test_calc_euler_integral_fast_cov_matches_compute_cov_contrib():
     assert np.allclose(cov_contrib, expected_cov_contrib * pref**2)
 
 
-def test_calc_euler_integral_fast_and_slow_cov_disagree_beyond_first_lag():
-    """Known incompatibility (see BUGS.md): the fast_cov=True and
-    fast_cov=False branches are NOT equivalent beyond the first lag, because
-    fast_cov=False re-divides the running sum by (M - 1) at every step
-    instead of once at the end. This test pins the current, divergent
-    behaviour rather than asserting the (incorrect) equivalence."""
+def test_calc_euler_integral_fast_and_slow_cov_agree():
+    """fast_cov=True (compute_cov_contrib) and fast_cov=False (the plain
+    einsum + cumulative-sum path) must produce equivalent uncertainties."""
     rng = np.random.default_rng(7)
     n = 6
     data = rng.normal(size=n)
@@ -206,10 +172,7 @@ def test_calc_euler_integral_fast_and_slow_cov_disagree_beyond_first_lag():
         include_cov=True, fast_cov=False,
     )
 
-    # they agree trivially at lag 0 and 1 ...
-    assert np.allclose(fast[1][:2], slow[1][:2])
-    # ... but diverge from lag 2 onward.
-    assert not np.allclose(fast[1][2:], slow[1][2:])
+    assert np.allclose(fast[1], slow[1])
 
 
 def test_calc_euler_integral_analytic_constant_data():

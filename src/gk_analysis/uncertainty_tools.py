@@ -32,39 +32,6 @@ HCACF_UNIT = flux2SI**2
 time_factor = 1.0
 
 
-def calc_correlation_old(data, num_pieces):
-    """
-    Function to compute the autocorrelation out of a set of data by first splitting it into individual pieces.
-    Evaluates the uncertainty solely based on the differences between the pieces.
-    The differences of the correlation function for each piece and its mean are also given.
-    """
-    pieced_data = np.split(data, num_pieces)
-    corrfuncs = []
-    plen = len(pieced_data[0])
-    contributions = np.array([plen - k for k in range(plen - 1)])
-    # this is BIG - better to just evaluate the required sum
-    # covariance = np.zeros((len(pieced_data[0])-1, len(pieced_data[0])-1))
-    caf2 = np.zeros(plen - 1)
-    for piece in pieced_data:
-
-        corrfuncs.append(
-            correlate(piece, piece, method="fft")[len(pieced_data[0]) :] / contributions
-        )
-        caf2 += correlate(piece**2, piece**2)[len(pieced_data[0]) :]
-
-    corrfunc = np.mean(corrfuncs, axis=0)
-    caf2 /= num_pieces * contributions
-
-    corrdiff = np.zeros((num_pieces, plen - 1))
-    for cid, cf in enumerate(corrfuncs):
-        corrdiff[cid] = cf - corrfunc
-    uncertainty = np.sqrt(
-        1 / num_pieces * np.sum(corrdiff**2, axis=0)
-    )  # / np.sqrt(num_pieces)
-    unc_caf = np.sqrt(caf2 - corrfunc**2) / np.sqrt(num_pieces * contributions - 1)
-    return corrfunc, uncertainty, unc_caf, corrdiff
-
-
 def calc_correlation(data, num_pieces=None):
     """
     Function to compute the autocorrelation out of a set of data by first splitting it into individual pieces.
@@ -153,7 +120,8 @@ def calc_euler_integral(
         else:
             cov = np.einsum("ij,ik->jk", corrdiff, corrdiff) / M
             for l in tqdm(range(1, k)):
-                covariance_contrib[l] = (covariance_contrib[l - 1] + np.sum(cov[l, 0:l])) / (M - 1)
+                covariance_contrib[l] = covariance_contrib[l - 1] + np.sum(cov[l, 0:l])
+            covariance_contrib /= M - 1
 
     else:
         covariance_contrib = 0

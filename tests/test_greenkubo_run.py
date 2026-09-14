@@ -332,55 +332,53 @@ def test_fold_flux_mean_correction(poscar_path, write_flux_file, rng):
 
 
 # ---------------------------------------------------------------------------
-# write_results: currently broken (see BUGS.md)
+# write_results
 # ---------------------------------------------------------------------------
 
 
-def test_write_results_raises_before_cepstral_analysis(poscar_path, write_flux_file, rng, chdir_tmp_path):
-    n = 10
+def test_write_results_auto_runs_cepstral_analysis_when_never_run(
+    poscar_path, write_flux_file, rng, chdir_tmp_path
+):
+    n = 512
     data = np.column_stack([np.full(n, 300.0), rng.normal(size=(n, 3))])
     path = write_flux_file(data)
     gk = GreenKubo_run(path, poscar_path, dt=1.0, n_cart=3)
 
-    # self.kappas does not exist until cepstral_analysis() has run
-    with pytest.raises(AttributeError):
-        gk.write_results("kappa.txt")
+    gk.write_results("kappa.txt")
+
+    written = np.loadtxt("kappa.txt")
+    assert written[0] == gk.t_evaluated
+    assert written[1] == pytest.approx(gk.kappa)
+    assert written[2] == pytest.approx(gk.kappa_err)
+    assert written[3] == gk.f_star
 
 
-def test_write_results_raises_missing_t_evaluated_with_explicit_f_star(
-    poscar_path, write_flux_file, rng, chdir_tmp_path
-):
-    """Known bug (see BUGS.md): cepstral_analysis() only sets self.t_evaluated
-    as a side effect of detect_f_star() (skipped when f_star is given
-    explicitly) or fold_flux(folds=...) (skipped when folds=None, the
-    default). Passing an explicit f_star with default folds therefore
-    leaves self.t_evaluated unset, and write_results() fails on that
-    *before* it ever gets to the (separately missing) self.f_star."""
+def test_write_results_with_explicit_f_star(poscar_path, write_flux_file, rng, chdir_tmp_path):
     n = 512
     data = np.column_stack([np.full(n, 300.0), rng.normal(size=(n, 3))])
     path = write_flux_file(data)
     gk = GreenKubo_run(path, poscar_path, dt=1.0, n_cart=3)
     gk.cepstral_analysis(f_star=10.0, plot_results=False)
 
-    with pytest.raises(AttributeError, match="t_evaluated"):
-        gk.write_results("kappa.txt")
+    gk.write_results("kappa.txt")
+
+    written = np.loadtxt("kappa.txt")
+    assert written[0] == n
+    assert written[3] == 10.0
 
 
-def test_write_results_raises_missing_f_star_after_cepstral_analysis(
-    poscar_path, write_flux_file, rng, chdir_tmp_path
-):
-    """Known bug (see BUGS.md): self.f_star is never assigned anywhere in
-    the class, so write_results() is currently unusable even once
-    self.t_evaluated has been set (via the default f_star=None path,
-    which routes through detect_f_star())."""
+def test_write_results_with_default_f_star(poscar_path, write_flux_file, rng, chdir_tmp_path):
     n = 512
     data = np.column_stack([np.full(n, 300.0), rng.normal(size=(n, 3))])
     path = write_flux_file(data)
     gk = GreenKubo_run(path, poscar_path, dt=1.0, n_cart=3)
     gk.cepstral_analysis(f_star=None, plot_results=False)
 
-    with pytest.raises(AttributeError, match="f_star"):
-        gk.write_results("kappa.txt")
+    gk.write_results("kappa.txt")
+
+    written = np.loadtxt("kappa.txt")
+    assert written[0] == n
+    assert written[3] == gk.detect_f_star()  # the stubbed constant, 10.0
 
 
 # ---------------------------------------------------------------------------

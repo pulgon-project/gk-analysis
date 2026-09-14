@@ -198,6 +198,8 @@ class GreenKubo_run:
             self.time_factor = ase.units.fs
             self.HCACF_UNIT = ase.units.J**2
 
+        self.kappas = None
+
     def _read_flux(self, flux_file, max_rows=None, take_every=1):
         """
         Reads the heat flux from several files in an array.
@@ -532,6 +534,7 @@ class GreenKubo_run:
         self.kappa_averaged = None
         if f_star is None:
             f_star = self.detect_f_star()
+        self.f_star = f_star
         # computing the cutoff to be used for the resample_poly function
         cutoff_steps = int(round(1.0 / (f_star * 2.0 * self.dt)))
         if cutoff_steps == 0:
@@ -744,6 +747,7 @@ class GreenKubo_run:
                 np.min(flux, axis=0),
             )
         fluxes = flux.transpose((1, 0))
+        self.t_evaluated = fluxes.shape[1]
         # make sure that we do not get fluxes across the individual simulation boundaries
         # breakpoints = self.flens
         if folds is not None:

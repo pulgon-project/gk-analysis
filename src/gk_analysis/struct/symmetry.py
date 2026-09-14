@@ -46,22 +46,22 @@ class Symmetry:
     def get_axial_point_group(self):
         # only import the pulgon tools if needed
         try:
-            from pulgon_tools_wip.detect_point_group import LineGroupAnalyzer
+            from pulgon_tools.detect_point_group import LineGroupAnalyzer
 
             mol = Molecule(species=self.atoms.numbers, coords=self.atoms.positions)
             self.line_group_analyzer = LineGroupAnalyzer(mol, tolerance=self.symprec)
             self.axial_point_group = self.line_group_analyzer.get_pointgroup()
         except ImportError:
             self.axial_point_group = None
-            logging.warning("pulgon_tools_wip not installed")
+            logging.warning("pulgon_tools not installed")
         except Exception as e:
-            logging.warning("WARNING axial point group detection failed: ", e)
+            logging.warning("WARNING axial point group detection failed: %s", e)
 
         return self.axial_point_group
 
     def get_cyclic_point_group(self):
         try:
-            from pulgon_tools_wip.detect_generalized_translational_group import (
+            from pulgon_tools.detect_generalized_translational_group import (
                 CyclicGroupAnalyzer,
             )
 
@@ -74,9 +74,9 @@ class Symmetry:
         except ImportError:
             self.cyclic_point_group = None
             self.cyclic_monomers = None
-            logging.warning("pulgon_tools_wip not installed")
+            logging.warning("pulgon_tools not installed")
         except Exception as e:
-            logging.warning("WARNING cyclic point group detection failed: ", e)
+            logging.warning("WARNING cyclic point group detection failed: %s", e)
 
         return self.cyclic_point_group
 

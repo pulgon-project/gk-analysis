@@ -60,7 +60,7 @@ def test_get_space_group_diamond_si_primitive_cell_is_wrong():
 
 
 # ---------------------------------------------------------------------------
-# pulgon_tools_wip: weak/optional dependency handling
+# pulgon_tools: weak/optional dependency handling
 # ---------------------------------------------------------------------------
 
 
@@ -68,7 +68,7 @@ def test_axial_and_cyclic_point_group_return_none_when_pulgon_missing(monkeypatc
     real_import = builtins.__import__
 
     def fake_import(name, *args, **kwargs):
-        if name.startswith("pulgon_tools_wip"):
+        if name.startswith("pulgon_tools"):
             raise ImportError("simulated missing dependency")
         return real_import(name, *args, **kwargs)
 
@@ -80,19 +80,19 @@ def test_axial_and_cyclic_point_group_return_none_when_pulgon_missing(monkeypatc
 
     assert sym.axial_point_group is None
     assert sym.cyclic_point_group is None
-    assert any("pulgon_tools_wip not installed" in msg for msg in caplog.messages)
+    assert any("pulgon_tools not installed" in msg for msg in caplog.messages)
 
 
 def test_axial_and_cyclic_point_group_not_skipped_when_pulgon_available(caplog):
     # Symmetry imports these specific submodules, not just the top-level
     # package -- importorskip the exact names it needs so this test skips
-    # cleanly on an environment with an incompatible pulgon_tools_wip
-    # version (missing these submodules) instead of failing.
-    pytest.importorskip("pulgon_tools_wip.detect_point_group")
-    pytest.importorskip("pulgon_tools_wip.detect_generalized_translational_group")
+    # cleanly on an environment without a compatible pulgon_tools install
+    # (missing these submodules) instead of failing.
+    pytest.importorskip("pulgon_tools.detect_point_group")
+    pytest.importorskip("pulgon_tools.detect_generalized_translational_group")
 
     atoms = bulk("Fe", "bcc", a=2.87, cubic=True)
     with caplog.at_level("WARNING"):
         Symmetry(atoms)
 
-    assert not any("pulgon_tools_wip not installed" in msg for msg in caplog.messages)
+    assert not any("pulgon_tools not installed" in msg for msg in caplog.messages)

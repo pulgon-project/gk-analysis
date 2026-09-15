@@ -366,7 +366,7 @@ def test_write_results_with_default_f_star(poscar_path, write_flux_file, rng, ch
 
     written = np.loadtxt("kappa.txt")
     assert written[0] == n
-    assert written[3] == gk.detect_f_star()  # the stubbed constant, 10.0
+    assert written[3] == gk.detect_f_star()  # falls back to the 10.0 default (pure noise, n=512)
 
 
 # ---------------------------------------------------------------------------
@@ -620,13 +620,43 @@ def test_analyze_euler_cov_contrib_nonnegative_and_monotone_for_constant_hcacf(
 # ---------------------------------------------------------------------------
 
 
-def test_detect_f_star_stub_pinned_value(poscar_path, write_flux_file, rng, chdir_tmp_path):
-    """detect_f_star is a stub that ignores its input and always returns
-    10.0 -- pin that documented (if surprising) current behaviour."""
+def test_detect_f_star_falls_back_to_default_on_pure_noise(
+    poscar_path, write_flux_file, rng, chdir_tmp_path
+):
+    """With too few time steps for the (much larger, default) baseline
+    window to be meaningful, detect_f_star refuses to run peak detection
+    and falls back to the fixed 10.0 THz default -- same as on data with no
+    detectable feature at all."""
     n = 512
     data = np.column_stack([np.full(n, 300.0), rng.normal(size=(n, 3))])
     path = write_flux_file(data)
     gk = GreenKubo_run(path, poscar_path, dt=1.0, n_cart=3)
 
     assert gk.detect_f_star() == 10.0
+    assert gk.t_evaluated == n
+    assert gk.f_star_diagnostics["insufficient_data"] is True
+
+
+def test_detect_f_star_finds_feature_before_injected_resonance(
+    poscar_path, write_flux_file, rng, chdir_tmp_path
+):
+    """A sharp resonance injected into the flux should be detected as the
+    first prominent spectral feature, and f_star should land at the valley
+    just before it -- not on top of it or past it."""
+    n = 20000
+    t = np.arange(n)
+    f0_raw = 0.05  # cycles/sample; dt=1.0 -> self.dt = 1e-3 ps -> 50 THz
+    expected_peak_thz = f0_raw / 1e-3
+    sinusoid = 6.0 * np.sin(2 * np.pi * f0_raw * t)
+    flux_cols = rng.normal(scale=1.0, size=(n, 3)) + sinusoid[:, None]
+    data = np.column_stack([np.full(n, 300.0), flux_cols])
+    path = write_flux_file(data)
+    gk = GreenKubo_run(path, poscar_path, dt=1.0, n_cart=3)
+
+    f_star = gk.detect_f_star(smoothing_window=100)
+
+    assert gk.f_star_diagnostics["peak_freq"] == pytest.approx(
+        expected_peak_thz, abs=5.0
+    )
+    assert f_star < gk.f_star_diagnostics["peak_freq"]
     assert gk.t_evaluated == n

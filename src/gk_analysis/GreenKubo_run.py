@@ -467,10 +467,48 @@ class GreenKubo_run:
                             fig.clf()
         return f
 
-    def detect_f_star(self, max_eval=None):
+    def detect_f_star(
+        self,
+        max_eval=None,
+        prominence_sigma=5.0,
+        smoothing_window=1000,
+        baseline_multiple=5,
+        min_data_multiple=4,
+    ):
         """
         Detects the frequency at which the flux data should be resampled to compute the thermal conductivity.
         This is done based on the first prominent feature in the cepstra.
+
+        The (smoothed) power spectrum typically features a decaying peak at
+        f=0 -- the physically relevant, de-noised signal -- and can also
+        contain sharp features further out (e.g. phonon resonances) that
+        contaminate a cepstral fit if not excluded. This walks outward from
+        f=0 and looks for the first peak whose height above a broad local
+        baseline clearly exceeds the local noise level, then returns the
+        frequency of the valley immediately before it -- the last clean
+        point before that feature starts to rise. If no sufficiently
+        prominent feature is found, falls back to the fixed 10.0 THz
+        default this method used to always return.
+
+        The significance threshold is evaluated on the *relative* excess of
+        the spectrum over a much broader rolling-median baseline, rather
+        than on absolute spectral power: periodogram noise is multiplicative
+        (its variance scales with the local spectral density itself, not a
+        flat additive floor), so a fixed absolute or tail-only noise
+        estimate would be badly miscalibrated near the large f=0 feature.
+
+        Parameters:
+            max_eval (int, optional): The maximum time step to consider. Defaults to None (use all).
+            prominence_sigma (float, optional): How many noise-sigma a peak must rise above its
+                local baseline to count as "prominent". Defaults to 5.0.
+            smoothing_window (int, optional): Window size (in samples) of the rolling mean used
+                to denoise the spectrum before peak detection. Defaults to 1000.
+            baseline_multiple (float, optional): The local baseline against which peaks are judged
+                is a rolling median of width `baseline_multiple * smoothing_window`. Defaults to 5.
+            min_data_multiple (float, optional): Refuses to run peak detection (and falls back to
+                the fixed default) unless there are at least `min_data_multiple` times as many time
+                steps as the baseline window, since the rolling windows are not meaningful otherwise.
+                Defaults to 4.
 
         Returns:
             float: The frequency at which the flux data should be resampled.
@@ -483,26 +521,85 @@ class GreenKubo_run:
             flux = self.flux
         self.t_evaluated = len(flux)
 
-        n_fluxes = flux.shape[1]
-
         fluxes = flux.reshape((flux.shape[0], -1, self.n_cart)).transpose((1, 0, 2))
 
         freqs, ffts, spectra = calc_spectrum(
             fluxes, self.dt, time_factor=self.time_factor
         )
 
-        print(np.shape(ffts))
-
         import pandas as pd
 
+        n_steps = spectra.shape[-1]
+        baseline_window = max(int(round(baseline_multiple * smoothing_window)), 1)
+        self.f_star_diagnostics = {}
+
+        if n_steps < min_data_multiple * baseline_window:
+            # too few time steps for the rolling windows below to be a
+            # meaningful denoising/baseline operation -- the spectrum
+            # collapses into a near-constant curve whose only remaining
+            # "structure" is a boundary artifact of the rolling window
+            # running out of data, not real signal or noise. Peak detection
+            # is not trustworthy in this regime, so don't attempt it and
+            # fall back to the previous fixed default instead.
+            self.f_star_diagnostics["insufficient_data"] = True
+            return 10.0
+
         filtered_spectrum = (
-            pd.Series(spectra[0, 0, :])
-            .rolling(1000, min_periods=1, center=True)
+            pd.Series(spectra[0, 0, :].real)
+            .rolling(smoothing_window, min_periods=1, center=True)
             .mean()
             .to_numpy()
         )
 
-        return 10.0
+        # spectra are Hermitian-symmetric for real-valued flux; only the
+        # non-negative-frequency half is physically meaningful here.
+        pos_mask = freqs >= 0
+        freqs_pos = freqs[pos_mask]
+        spectrum_pos = filtered_spectrum[pos_mask]
+
+        # broad local baseline (much wider than the denoising window above),
+        # against which local, relative excess is measured
+        baseline = (
+            pd.Series(spectrum_pos)
+            .rolling(baseline_window, min_periods=1, center=True)
+            .median()
+            .to_numpy()
+        )
+        baseline = np.maximum(baseline, np.finfo(float).eps)
+        relative_excess = spectrum_pos / baseline - 1.0
+
+        # local noise level of the relative excess, estimated robustly
+        # (median absolute deviation) -- roughly homogeneous across
+        # frequency by construction, unlike the raw spectrum
+        noise_sigma = 1.4826 * np.median(
+            np.abs(relative_excess - np.median(relative_excess))
+        )
+        noise_sigma = max(noise_sigma, np.finfo(float).eps)
+
+        # search for peaks starting just after f=0, since the DC feature
+        # itself is the signal of interest, not a contaminating feature
+        peaks, properties = scipy.signal.find_peaks(
+            relative_excess[1:], prominence=prominence_sigma * noise_sigma
+        )
+
+        self.f_star_diagnostics = {
+            "freqs": freqs_pos,
+            "filtered_spectrum": spectrum_pos,
+            "baseline": baseline,
+            "relative_excess": relative_excess,
+            "noise_sigma": noise_sigma,
+        }
+
+        if len(peaks) == 0:
+            return 10.0
+
+        first_peak_idx = peaks[0] + 1
+        valley_idx = max(int(properties["left_bases"][0]) + 1, 1)
+
+        self.f_star_diagnostics["peak_freq"] = freqs_pos[first_peak_idx]
+        self.f_star_diagnostics["valley_freq"] = freqs_pos[valley_idx]
+
+        return float(freqs_pos[valley_idx])
 
     def cepstral_analysis(
         self,
